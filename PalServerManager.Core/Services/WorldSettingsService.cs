@@ -175,6 +175,33 @@ public sealed class WorldSettingsService(PalContext context, LoggingService log,
     public Task<Dictionary<string, string>> ImportCurrentIniAsync(CancellationToken cancellationToken = default) =>
         ReadValuesAsync(context.ServerPaths.SettingsPath, ProfileDefinitions, cancellationToken);
 
+    public Task<Dictionary<string, string>> ImportProfileFromIniAsync(string path, CancellationToken cancellationToken = default) =>
+        ReadValuesAsync(Path.GetFullPath(path), ProfileDefinitions, cancellationToken);
+
+    public async Task<Dictionary<string, string>> ResolveExistingWorldSourceAsync(
+        ExistingWorldSettingsChoice choice, SaveSlotRegistry registry, CancellationToken cancellationToken = default)
+    {
+        Dictionary<string, string> values = choice.Mode switch
+        {
+            ExistingWorldSettingsMode.ActiveProfile => new((await LoadProfileAsync(registry.ActiveSlotId,
+                registry.Slots.Single(slot => slot.Id == registry.ActiveSlotId).WorldGuid, cancellationToken)).Values, StringComparer.OrdinalIgnoreCase),
+            ExistingWorldSettingsMode.OtherProfile when choice.SourceSlotId is { } id && registry.Slots.Any(slot => slot.Id == id) =>
+                new((await LoadProfileAsync(id, registry.Slots.Single(slot => slot.Id == id).WorldGuid, cancellationToken)).Values,
+                    StringComparer.OrdinalIgnoreCase),
+            ExistingWorldSettingsMode.OtherProfile => throw new InvalidOperationException("请选择已登记的设置来源存档。"),
+            ExistingWorldSettingsMode.CurrentServerIni => await ImportCurrentIniAsync(cancellationToken),
+            ExistingWorldSettingsMode.GameDefaults => await GetDefaultValuesAsync(cancellationToken),
+            ExistingWorldSettingsMode.Custom when choice.CustomValues is not null => FilterValues(choice.CustomValues, ProfileDefinitions),
+            ExistingWorldSettingsMode.Custom => throw new InvalidOperationException("尚未完成自定义世界设置。"),
+            ExistingWorldSettingsMode.ExternalIni when !string.IsNullOrWhiteSpace(choice.ExternalIniPath) =>
+                await ImportProfileFromIniAsync(choice.ExternalIniPath, cancellationToken),
+            ExistingWorldSettingsMode.ExternalIni => throw new InvalidOperationException("请选择外部 PalWorldSettings.ini。"),
+            _ => throw new InvalidOperationException("未知的世界设置来源。")
+        };
+        ValidateProfileValues(values);
+        return values;
+    }
+
     public async Task<Dictionary<string, string>> GetDefaultValuesAsync(CancellationToken cancellationToken = default)
     {
         var values = await ReadValuesAsync(context.ServerPaths.DefaultWorldSettingsPath, ProfileDefinitions, cancellationToken);
@@ -423,7 +450,7 @@ public sealed class WorldSettingsService(PalContext context, LoggingService log,
     }
 
 
-    private static void ValidateProfileValues(IReadOnlyDictionary<string, string> values)
+    public static void ValidateProfileValues(IReadOnlyDictionary<string, string> values)
     {
         foreach (var definition in ProfileDefinitions)
         {

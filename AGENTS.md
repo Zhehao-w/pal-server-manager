@@ -27,6 +27,13 @@ slot-bound Manager metadata. Record the transaction, roll back on ordinary
 failures, and retain the journal and snapshot if recovery cannot be verified.
 Never delete active SaveGames\\0 through this feature.
 
+Discovery is read-only; registration/import is explicit; reconciliation never
+guesses authority. Existing-world import registers a complete, unique parked
+world in place only after fresh validation and an explicit per-world settings
+source choice. It must not silently change global server settings or save data.
+Keep missing/mismatched registered profiles fail-closed rather than weakening
+startup authority to make a repair UI reachable.
+
 Do not commit real saves, game Config, Manager runtime JSON, passwords, player
 identities, world UIDs, logs, backups, or local recovery evidence. Review the
 circular icon's provenance and redistribution rights, package notices, privacy,

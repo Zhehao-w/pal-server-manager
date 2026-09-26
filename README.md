@@ -18,9 +18,15 @@ If PalServer has not yet created a world, start it once outside the Manager, wai
 
 The application, PalServer installation, and Manager state remain separate. Manager registration and state live under `%LOCALAPPDATA%\PalServerManager`; game saves and configuration remain under the PalServer installation. Attaching an existing installation does not modify `SaveGames` or game configuration. Keep your own independent backups of important worlds.
 
+To add an existing world to an already managed server, stop PalServer and manually place its complete world folder directly under that server's `Pal\Saved\SaveGames`. In the save selector, choose **Rescan** to review disk-only worlds and any registry/profile discrepancies, then explicitly **Import** a valid unique-UID candidate. Choose a Manager tag and a World Settings source; import registers the folder in place and does not start the server or alter global server settings. `WorldOption.sav` / `WorldOptions.sav` is reported as a possible world-local settings override, not modified.
+
+PalServerManager does not move Palworld saves between PCs. If moving to a new PC, copy the PalServer installation and saves yourself, then install the Manager, select `PalServer.exe`, and attach the existing worlds. No prior Manager state is required for that first-time attachment.
+
 ## World safety
 
 Unknown or duplicate world UIDs, incomplete Manager state, and unresolved operations block startup or switching. Switching and rollback use protective snapshots and transaction records.
+
+Rescan is read-only and never repairs discrepancies. Missing or identity-mismatched registered profiles remain fail-closed at startup; recovery of those cases needs explicit identity verification and is not automated by this feature.
 
 **Delete Save** is available only for a registered inactive world while PalServer is stopped and the identity audit is healthy. The Manager first creates and verifies a complete recovery snapshot of the parked world and its world-specific metadata. To delete the active world, first switch another world to active and stop the server. Retain the snapshot if you may need to recover a deleted world.
 

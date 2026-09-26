@@ -213,4 +213,6 @@ public partial class SaveSelectorViewModel(SaveSlotService slots, BackupService 
         foreach (var display in displays) Saves.Add(display);
         SelectedSave = Saves.FirstOrDefault(save => save.Id == targetId) ?? Saves.FirstOrDefault();
     }
+
+    public Task RefreshSavesAsync(int? selectId = null) => ReloadAsync(selectId);
 }

@@ -50,36 +50,13 @@ public sealed class ServerStateService(AppPaths app, SafeFileService files)
     {
         if (!ServerRootService.IsValidRoot(server.ServerRoot))
             throw new InvalidOperationException("PalServer 路径无效。");
-        var saveRoot = new ServerPaths(server.ServerRoot).SaveRoot;
-        if (!Directory.Exists(saveRoot)) return [];
-        var active = ReadWorld("0");
-        var parked = Directory.EnumerateDirectories(saveRoot)
-            .Where(path => !Path.GetFileName(path).Equals("0", StringComparison.OrdinalIgnoreCase))
-            .Select(path => ReadWorld(Path.GetFileName(path)))
-            .Where(world => world is not null)
-            .Cast<DiscoveredWorld>()
-            .OrderBy(world => world.FolderName, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        if (parked.Length > 0 && active is null)
+        var report = new WorldDiscoveryService(new ServerPaths(server.ServerRoot)).ScanAsync().GetAwaiter().GetResult();
+        var invalid = report.Worlds.FirstOrDefault(world => world.Status != WorldDiscoveryStatus.Importable);
+        if (invalid is not null) throw new InvalidOperationException($"无法接入 {invalid.FolderName}：{invalid.Reason}");
+        var active = report.Worlds.FirstOrDefault(world => world.FolderName == "0");
+        if (active is null && report.Worlds.Count > 0)
             throw new InvalidOperationException("发现停放世界，但没有当前世界 0；无法判断哪一个应为当前存档。");
-        var worlds = active is null ? [] : new[] { active }.Concat(parked).ToArray();
-        if (worlds.GroupBy(world => world.WorldGuid, StringComparer.OrdinalIgnoreCase).Any(group => group.Count() > 1))
-            throw new InvalidOperationException("发现重复的世界 UID；接入前必须确认世界身份，不能自动合并。");
-        return worlds;
-
-        DiscoveredWorld? ReadWorld(string folderName)
-        {
-            var parent = Path.Combine(saveRoot, folderName);
-            if (!Directory.Exists(parent)) return null;
-            var candidates = Directory.EnumerateDirectories(parent)
-                .Where(path => Guid.TryParseExact(Path.GetFileName(path), "N", out _)).ToArray();
-            if (candidates.Length == 0) return null;
-            if (candidates.Length != 1)
-                throw new InvalidOperationException($"{folderName} 包含多个世界 UID，无法安全接入。");
-            if (!File.Exists(Path.Combine(candidates[0], "Level.sav")))
-                throw new InvalidOperationException($"{folderName} 的世界缺少 Level.sav。");
-            return new DiscoveredWorld(folderName, Path.GetFileName(candidates[0]).ToUpperInvariant(), folderName == "0");
-        }
+        return report.Worlds.Select(world => new DiscoveredWorld(world.FolderName, world.WorldUid!, world.FolderName == "0")).ToArray();
     }
 
     public async Task AttachAsync(RegisteredServer server, CancellationToken cancellationToken = default)

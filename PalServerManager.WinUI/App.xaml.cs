@@ -73,12 +73,14 @@ public partial class App : Application
             var builds = new PalServerBuildService(context, safeFiles);
             var journal = new OperationJournalService(context, safeFiles);
             var deletion = new DeleteWorldService(context, processes, slots, identity, backups, safeFiles, journal, logging);
+            var discovery = new WorldDiscoveryService(context.ServerPaths, context.StatePaths);
+            var importer = new WorldImportService(context, processes, slots, worldSettings, identity, discovery, journal, logging);
             var manager = new ServerManagerService(context, processes, rest, slots, worldSettings, keepAwake, backups, identity, worldOptions, builds, journal, safeFiles, new PowerService(), logging);
             StartupChoice? startupChoice = null;
             if (!processes.GetSnapshot().IsRunning)
             {
                 var selectorViewModel = new SaveSelectorViewModel(slots, backups, worldSettings, deletion);
-                var selector = new SaveSelectorWindow(selectorViewModel, worldSettings);
+                var selector = new SaveSelectorWindow(selectorViewModel, worldSettings, slots, discovery, importer);
                 var selectorChoice = selector.ShowAsync();
                 setup?.Dismiss(); // successor window is active before setup closes
                 setup = null;
