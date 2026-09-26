@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using HaoHaoTianTian.PalHR.Models;
 
 namespace HaoHaoTianTian.PalHR.Services;
@@ -50,13 +49,8 @@ public sealed class ServerStateService(AppPaths app, SafeFileService files)
     {
         if (!ServerRootService.IsValidRoot(server.ServerRoot))
             throw new InvalidOperationException("PalServer 路径无效。");
-        var report = new WorldDiscoveryService(new ServerPaths(server.ServerRoot)).ScanAsync().GetAwaiter().GetResult();
-        var invalid = report.Worlds.FirstOrDefault(world => world.Status != WorldDiscoveryStatus.Importable);
-        if (invalid is not null) throw new InvalidOperationException($"无法接入 {invalid.FolderName}：{invalid.Reason}");
-        var active = report.Worlds.FirstOrDefault(world => world.FolderName == "0");
-        if (active is null && report.Worlds.Count > 0)
-            throw new InvalidOperationException("发现停放世界，但没有当前世界 0；无法判断哪一个应为当前存档。");
-        return report.Worlds.Select(world => new DiscoveredWorld(world.FolderName, world.WorldUid!, world.FolderName == "0")).ToArray();
+        var active = new WorldDiscoveryService(new ServerPaths(server.ServerRoot)).DiscoverActive();
+        return active is null ? [] : [new DiscoveredWorld("0", active.WorldUid!, true)];
     }
 
     public async Task AttachAsync(RegisteredServer server, CancellationToken cancellationToken = default)
@@ -78,7 +72,7 @@ public sealed class ServerStateService(AppPaths app, SafeFileService files)
                   Path.GetFileName(path).Equals("StateActivation.json", StringComparison.OrdinalIgnoreCase))))
             throw new InvalidOperationException("目标管理状态目录已有内容，不能覆盖。");
 
-        var registry = BuildRegistry(worlds, context.ServerPaths.SaveRoot);
+        var registry = BuildRegistry(worlds.Single(), context.ServerPaths.SaveRoot);
         var stage = Path.Combine(app.ServersStateRoot, $".setup-{server.Id}-{Guid.NewGuid():N}");
         Directory.CreateDirectory(stage);
         string? preserved = null;
@@ -138,36 +132,15 @@ public sealed class ServerStateService(AppPaths app, SafeFileService files)
         Directory.Exists(app.ServersStateRoot) &&
         Directory.EnumerateDirectories(app.ServersStateRoot, $".*-{server.Id}-*").Any();
 
-    private static SaveSlotRegistry BuildRegistry(IReadOnlyList<DiscoveredWorld> worlds, string saveRoot)
+    private static SaveSlotRegistry BuildRegistry(DiscoveredWorld active, string saveRoot)
     {
-        var parked = worlds.Where(world => !world.IsActive).ToArray();
-        var assigned = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        var used = new HashSet<int>();
-        foreach (var world in parked)
-        {
-            var match = Regex.Match(world.FolderName, @"^0 - Slot (?<id>\d{3}) - (?<tag>.+)$", RegexOptions.IgnoreCase);
-            if (match.Success && int.TryParse(match.Groups["id"].Value, out var id) && used.Add(id))
-                assigned[world.FolderName] = id;
-        }
-        var next = 0;
-        int ClaimNext() { while (used.Contains(next)) next++; var id = next++; used.Add(id); return id; }
-        var activeId = ClaimNext();
-        foreach (var world in parked)
-            if (!assigned.ContainsKey(world.FolderName)) assigned[world.FolderName] = ClaimNext();
-        var slots = new List<SaveSlot>();
-        foreach (var world in worlds)
-        {
-            var id = world.IsActive ? activeId : assigned[world.FolderName];
-            var match = Regex.Match(world.FolderName, @"^0 - Slot \d{3} - (?<tag>.+)$", RegexOptions.IgnoreCase);
-            var tag = world.IsActive ? $"世界 {id}" : match.Success ? match.Groups["tag"].Value : world.FolderName;
-            tag = tag.Length > 40 ? tag[..40] : tag;
-            tag = SaveSlotService.ValidateTag(tag);
-            var parkedFolder = world.IsActive ? SaveSlotService.NewParkedFolderName(id, tag) : world.FolderName;
-            if (world.IsActive && Directory.Exists(Path.Combine(saveRoot, parkedFolder)))
-                throw new InvalidOperationException("当前世界预留的停放目录已存在；请先检查 SaveGames。");
-            slots.Add(new SaveSlot { Id = id, Tag = tag, WorldGuid = world.WorldGuid, ParkedFolder = parkedFolder });
-        }
-        return new SaveSlotRegistry { ActiveSlotId = activeId, NextSlotId = used.Max() + 1, Slots = slots.OrderBy(slot => slot.Id).ToList() };
+        const int id = 0;
+        var tag = SaveSlotService.ValidateTag("世界 0");
+        var parkedFolder = SaveSlotService.NewParkedFolderName(id, tag);
+        if (Directory.Exists(Path.Combine(saveRoot, parkedFolder)))
+            throw new InvalidOperationException("当前世界预留的停放目录已存在；请先检查 SaveGames。");
+        return new SaveSlotRegistry { ActiveSlotId = id, NextSlotId = 1, Slots =
+            [new SaveSlot { Id = id, Tag = tag, WorldGuid = active.WorldGuid, ParkedFolder = parkedFolder }] };
     }
 
     private static async Task ValidateStateAsync(string root, RegisteredServer server, CancellationToken cancellationToken)

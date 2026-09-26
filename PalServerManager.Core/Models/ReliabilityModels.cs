@@ -16,7 +16,7 @@ public sealed class WorldIdentityAuditResult
 }
 
 public sealed record WorldOptionConflict(string WorldUid, string FilePath, long Length, DateTime LastWriteTimeUtc);
-public enum WorldOptionDecision { Cancel, Continue, BackupAndDisable }
+public enum WorldOptionDecision { Cancel, BackupAndDisable }
 public enum UpdateProtectionDecision { Cancel, StartOnly, SnapshotAndStart }
 
 public sealed class PendingOperation

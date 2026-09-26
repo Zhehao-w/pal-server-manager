@@ -4,11 +4,59 @@ using HaoHaoTianTian.PalHR.Models;
 
 namespace HaoHaoTianTian.PalHR.Services;
 
-/// <summary>Top-level SaveGames observation only. This service never writes game or Manager state.</summary>
+/// <summary>Shallow SaveGames and selected-source observation; never writes game or Manager state.</summary>
 public sealed partial class WorldDiscoveryService(ServerPaths server, ServerStatePaths? state = null)
 {
     private static readonly HashSet<string> IgnoredNames = new(StringComparer.OrdinalIgnoreCase)
     { "backup", "backups", "savebackups", "snapshots", "evidence", "staging" };
+
+    public WorldObservation? DiscoverActive()
+    {
+        var path = server.ActivePath;
+        if (!Directory.Exists(path)) return null;
+        var observation = InspectFolder(server.SaveRoot, path, "0", null, null);
+        if (observation.Status != WorldDiscoveryStatus.Importable)
+            throw new InvalidOperationException($"当前世界 0 无法接入：{observation.Reason}");
+        return observation;
+    }
+
+    /// <summary>Inspect only the selected folder, its UID child, or its immediate save containers.</summary>
+    public async Task<WorldDiscoveryReport> ScanSourceAsync(string selectedPath, SaveSlotRegistry registry,
+        CancellationToken cancellationToken = default)
+    {
+        var selected = Path.GetFullPath(selectedPath);
+        if (!Directory.Exists(selected)) throw new DirectoryNotFoundException($"找不到导入来源：{selected}");
+        if (HasReparsePoint(selected)) throw new InvalidOperationException("导入来源是重解析点，已拒绝扫描。");
+        var name = Path.GetFileName(selected.TrimEnd(Path.DirectorySeparatorChar));
+        List<WorldObservation> worlds;
+        if (UidRegex().IsMatch(name))
+            worlds = [InspectDirectUid(selected, name)];
+        else
+        {
+            var children = Directory.EnumerateDirectories(selected, "*", SearchOption.TopDirectoryOnly).ToArray();
+            if (children.Any(child => UidRegex().IsMatch(Path.GetFileName(child))))
+                worlds = [InspectFolder(Path.GetDirectoryName(selected)!, selected, name, null, null)];
+            else
+                worlds = children.Where(child => !IsInternalOrBackup(Path.GetFileName(child)))
+                    .Select(child => InspectFolder(selected, child, Path.GetFileName(child), null, null)).ToList();
+        }
+
+        var current = await ScanAsync(registry, cancellationToken);
+        var managedUids = registry.Slots.Select(slot => slot.WorldGuid).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var group in worlds.Where(world => world.WorldUid is not null)
+                     .GroupBy(world => world.WorldUid!, StringComparer.OrdinalIgnoreCase))
+        {
+            var duplicate = group.Count() > 1 || managedUids.Contains(group.Key) ||
+                current.Worlds.Any(disk => disk.WorldUid?.Equals(group.Key, StringComparison.OrdinalIgnoreCase) == true &&
+                    !group.Any(source => IsSameSource(disk, source)));
+            if (!duplicate) continue;
+            for (var index = 0; index < worlds.Count; index++)
+                if (worlds[index].WorldUid?.Equals(group.Key, StringComparison.OrdinalIgnoreCase) == true)
+                    worlds[index] = worlds[index] with { Status = WorldDiscoveryStatus.DuplicateUid,
+                        Reason = "世界 UID 与已登记或另一磁盘目录重复；不能导入。" };
+        }
+        return new(worlds, []);
+    }
 
     public async Task<WorldDiscoveryReport> ScanAsync(SaveSlotRegistry? registry = null, CancellationToken cancellationToken = default)
     {
@@ -74,8 +122,8 @@ public sealed partial class WorldDiscoveryService(ServerPaths server, ServerStat
     private static WorldObservation InspectFolder(string root, string path, string name, SaveSlot? slot, SaveSlotRegistry? registry)
     {
         var unusual = name != "0" && !CanonicalNameRegex().IsMatch(name);
-        WorldObservation Result(string? uid, WorldDiscoveryStatus status, string reason, bool hasOption = false) =>
-            new(name, path, uid, slot?.Id, slot?.Tag, status, reason, hasOption, unusual);
+        WorldObservation Result(string? uid, WorldDiscoveryStatus status, string reason, bool hasOption = false, string? worldPath = null) =>
+            new(name, path, uid, slot?.Id, slot?.Tag, status, reason, hasOption, unusual, worldPath);
         try
         {
             PathSafety.RequireInside(root, path);
@@ -93,21 +141,17 @@ public sealed partial class WorldDiscoveryService(ServerPaths server, ServerStat
             if (HasReparsePoint(uidPath))
                 return Result(uid, slot is null ? WorldDiscoveryStatus.Incomplete : WorldDiscoveryStatus.RegisteredIncomplete,
                     "世界 UID 目录是重解析点，不能导入。");
-            RejectNestedReparsePoints(uidPath);
             if (slot is not null && !uid.Equals(slot.WorldGuid, StringComparison.OrdinalIgnoreCase))
                 return Result(uid, WorldDiscoveryStatus.RegisteredIdentityMismatch,
-                    $"磁盘 UID {uid} 与登记 UID {slot.WorldGuid} 不一致；不能自动重认。 ");
-            var missing = new[] { "Level.sav", "LevelMeta.sav" }
-                .Where(file => !File.Exists(Path.Combine(uidPath, file))).ToArray();
+                    $"磁盘 UID {uid} 与登记 UID {slot.WorldGuid} 不一致；不能自动重认。 ", worldPath: uidPath);
+            var (missing, worldOption) = InspectRequiredFiles(uidPath);
             if (missing.Length > 0)
                 return Result(uid, slot is null ? WorldDiscoveryStatus.Incomplete : WorldDiscoveryStatus.RegisteredIncomplete,
-                    "缺少 " + string.Join("、", missing) + "。 ");
-            var worldOption = File.Exists(Path.Combine(uidPath, "WorldOption.sav")) ||
-                              File.Exists(Path.Combine(uidPath, "WorldOptions.sav"));
-            if (slot is not null) return Result(uid, WorldDiscoveryStatus.RegisteredHealthy, "登记身份及必要文件一致。", worldOption);
+                    "缺少 " + string.Join("、", missing) + "。 ", worldPath: uidPath);
+            if (slot is not null) return Result(uid, WorldDiscoveryStatus.RegisteredHealthy, "登记身份及必要文件一致。", worldOption, uidPath);
             if (name == "0" && registry is not null)
-                return Result(uid, WorldDiscoveryStatus.Ignored, "未登记的 active 目录不能作为附加世界导入。", worldOption);
-            return Result(uid, WorldDiscoveryStatus.Importable, "未登记的完整世界；需显式导入。", worldOption);
+                return Result(uid, WorldDiscoveryStatus.Ignored, "未登记的 active 目录不能作为附加世界导入。", worldOption, uidPath);
+            return Result(uid, WorldDiscoveryStatus.Importable, "未登记的完整世界；需显式导入。", worldOption, uidPath);
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
@@ -115,6 +159,47 @@ public sealed partial class WorldDiscoveryService(ServerPaths server, ServerStat
                 "无法安全检查目录：" + error.Message);
         }
     }
+
+    private static WorldObservation InspectDirectUid(string path, string uid)
+    {
+        try
+        {
+            if (HasReparsePoint(path)) throw new InvalidOperationException("世界 UID 目录是重解析点。");
+            var (missing, worldOption) = InspectRequiredFiles(path);
+            return missing.Length > 0
+                ? new(uid, path, uid.ToUpperInvariant(), null, null, WorldDiscoveryStatus.Incomplete,
+                    "缺少 " + string.Join("、", missing) + "。", WorldPath: path)
+                : new(uid, path, uid.ToUpperInvariant(), null, null, WorldDiscoveryStatus.Importable,
+                    "可导入的世界 UID 目录。", worldOption, WorldPath: path);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            return new(uid, path, uid.ToUpperInvariant(), null, null, WorldDiscoveryStatus.Incomplete,
+                "无法安全检查目录：" + error.Message);
+        }
+    }
+
+    private static (string[] Missing, bool WorldOption) InspectRequiredFiles(string uidPath)
+    {
+        var required = new[] { "Level.sav", "LevelMeta.sav" };
+        var missing = required.Where(file => !File.Exists(Path.Combine(uidPath, file))).ToArray();
+        foreach (var name in required.Concat(["WorldOption.sav", "WorldOptions.sav"]))
+        {
+            var path = Path.Combine(uidPath, name);
+            if (File.Exists(path) && HasReparsePoint(path))
+                throw new InvalidOperationException($"{name} 是重解析点。");
+        }
+        var players = Path.Combine(uidPath, "Players");
+        if (Directory.Exists(players) && HasReparsePoint(players))
+            throw new InvalidOperationException("Players 目录是重解析点。");
+        return (missing, File.Exists(Path.Combine(uidPath, "WorldOption.sav")) ||
+            File.Exists(Path.Combine(uidPath, "WorldOptions.sav")));
+    }
+
+    private static bool IsSameSource(WorldObservation disk, WorldObservation source) =>
+        string.Equals(disk.FolderPath, source.FolderPath, StringComparison.OrdinalIgnoreCase) ||
+        (disk.WorldPath is not null && source.WorldPath is not null &&
+         string.Equals(disk.WorldPath, source.WorldPath, StringComparison.OrdinalIgnoreCase));
 
     private async Task<IReadOnlyList<WorldProfileObservation>> InspectProfilesAsync(SaveSlotRegistry registry, CancellationToken ct)
     {
@@ -158,21 +243,6 @@ public sealed partial class WorldDiscoveryService(ServerPaths server, ServerStat
     }
 
     private static bool HasReparsePoint(string path) => (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0;
-    private static void RejectNestedReparsePoints(string root)
-    {
-        var pending = new Stack<string>();
-        pending.Push(root);
-        while (pending.Count > 0)
-        {
-            var current = pending.Pop();
-            var attributes = File.GetAttributes(current);
-            if ((attributes & FileAttributes.ReparsePoint) != 0)
-                throw new InvalidOperationException("世界目录包含重解析点，不能确认存档文件都位于 SaveGames 内。");
-            if ((attributes & FileAttributes.Directory) == 0) continue;
-            foreach (var child in Directory.EnumerateFileSystemEntries(current, "*", SearchOption.TopDirectoryOnly))
-                pending.Push(child);
-        }
-    }
     private static bool IsInternalOrBackup(string name) => name.StartsWith(".", StringComparison.Ordinal) ||
         IgnoredNames.Contains(name) || name.StartsWith("pal-", StringComparison.OrdinalIgnoreCase) ||
         name.StartsWith("switch-", StringComparison.OrdinalIgnoreCase) ||

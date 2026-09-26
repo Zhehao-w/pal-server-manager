@@ -130,14 +130,91 @@ public sealed partial class SaveSelectorWindow : Window
             }
             var candidate = await ShowDiscoveryAsync(report);
             if (candidate is null) return;
-            var request = await ChooseImportAsync(registry, candidate);
-            if (request is null) return;
-            var imported = await _importer.ImportAsync(candidate.FolderName, candidate.WorldUid!, request.Value.Tag, request.Value.Source);
-            await ViewModel.RefreshSavesAsync(imported.Id);
-            ViewModel.Feedback = $"已导入存档 {imported.Id} · {imported.Tag}；服务器没有自动启动。";
+            await ImportSelectedAsync(registry, [candidate]);
         }
         catch (Exception error) { ViewModel.Feedback = "扫描或导入失败：" + error.Message; }
         finally { ViewModel.IsBusy = false; }
+    }
+
+    private async void ImportSave_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel.IsBusy) return;
+        ViewModel.IsBusy = true;
+        try
+        {
+            var picker = new FolderPicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary };
+            picker.FileTypeFilter.Add("*");
+            InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
+            var folder = await picker.PickSingleFolderAsync();
+            if (folder is null) return;
+            var registry = await _slots.LoadAsync();
+            var report = await _discovery.ScanSourceAsync(folder.Path, registry);
+            var selected = await ShowSourceChoiceAsync(report, folder.Path);
+            if (selected.Count > 0) await ImportSelectedAsync(registry, selected);
+        }
+        catch (Exception error) { ViewModel.Feedback = "导入存档失败：" + error.Message; }
+        finally { ViewModel.IsBusy = false; }
+    }
+
+    private async Task<IReadOnlyList<WorldObservation>> ShowSourceChoiceAsync(WorldDiscoveryReport report, string sourcePath)
+    {
+        var valid = report.Worlds.Where(world => world.CanImport).ToArray();
+        if (valid.Length == 0)
+        {
+            var empty = new ContentDialog { XamlRoot = RootGrid.XamlRoot, Title = "没有可导入的存档",
+                Content = new TextBlock { Text = $"所选目录：{sourcePath}\n未找到 UID 唯一且包含 Level.sav 和 LevelMeta.sav 的世界。不会递归搜索备份目录。",
+                    TextWrapping = TextWrapping.Wrap, MaxWidth = 560 }, CloseButtonText = "关闭" };
+            await empty.ShowAsync();
+            return [];
+        }
+        var list = new ListView { MinWidth = 620, MaxHeight = 360, SelectionMode = ListViewSelectionMode.Multiple };
+        foreach (var world in valid)
+            list.Items.Add(new ListViewItem { Tag = world,
+                Content = new TextBlock { Text = $"{world.FolderName}   ·   {world.WorldUid}", TextTrimming = TextTrimming.CharacterEllipsis } });
+        var dialog = new ContentDialog { XamlRoot = RootGrid.XamlRoot, Title = "选择要导入的存档",
+            Content = new StackPanel { Spacing = 9, Children =
+            {
+                new TextBlock { Text = $"找到 {valid.Length} 个可导入世界。可多选；只扫描所选目录及其直接子目录。", TextWrapping = TextWrapping.Wrap }, list
+            } }, PrimaryButtonText = "继续", IsPrimaryButtonEnabled = false, CloseButtonText = "取消",
+            DefaultButton = ContentDialogButton.Close, MinWidth = 650 };
+        list.SelectionChanged += (_, _) => dialog.IsPrimaryButtonEnabled = list.SelectedItems.Count > 0;
+        return await dialog.ShowAsync() == ContentDialogResult.Primary
+            ? list.SelectedItems.Cast<ListViewItem>().Select(item => (WorldObservation)item.Tag).ToArray() : [];
+    }
+
+    private async Task ImportSelectedAsync(SaveSlotRegistry registry, IReadOnlyList<WorldObservation> candidates)
+    {
+        var request = await ChooseImportAsync(registry, candidates);
+        if (request is null) return;
+        var imported = new List<WorldImportResult>();
+        foreach (var candidate in candidates)
+        {
+            try
+            {
+                var tag = candidates.Count == 1 ? request.Value.SingleTag! : DefaultImportTag(candidate);
+                imported.Add(await _importer.ImportAsync(candidate.FolderPath, candidate.WorldUid!, tag, request.Value.Source));
+            }
+            catch (Exception error)
+            {
+                if (imported.Count > 0) await ViewModel.RefreshSavesAsync(imported[^1].Slot.Id);
+                ViewModel.Feedback = $"已导入 {imported.Count} 个；后续导入失败：{error.Message}";
+                return;
+            }
+        }
+        await ViewModel.RefreshSavesAsync(imported[^1].Slot.Id);
+        var warnings = imported.Where(item => item.CleanupWarning is not null).Select(item => item.CleanupWarning).ToArray();
+        ViewModel.Feedback = $"已导入 {imported.Count} 个存档；服务器没有自动启动。" +
+            (warnings.Length > 0 ? " " + string.Join(" ", warnings) : "");
+    }
+
+    private static string DefaultImportTag(WorldObservation candidate)
+    {
+        var name = candidate.FolderName;
+        if (name.Length == 32 && name.All(Uri.IsHexDigit))
+            name = System.IO.Path.GetFileName(System.IO.Path.GetDirectoryName(candidate.FolderPath))!;
+        if (name is "0" or "SaveGames" || string.IsNullOrWhiteSpace(name)) name = "导入存档";
+        if (name.Contains(" - ", StringComparison.Ordinal)) name = name.Split(" - ", 3).Last();
+        return SaveSlotService.ValidateTag(name.Length > 40 ? name[..40] : name);
     }
 
     private async Task<WorldObservation?> ShowDiscoveryAsync(WorldDiscoveryReport report)
@@ -157,8 +234,8 @@ public sealed partial class SaveSelectorWindow : Window
                 _ => "忽略"
             };
             var detail = observation.Reason + (observation.HasWorldOption
-                ? " 此世界包含 WorldOption.sav / WorldOptions.sav，游戏内设置可能覆盖部分服务器设置。" : "") +
-                (observation.UnusualFolderName ? " 文件夹名称不是管理器标准格式；导入时仍保持原名。" : "");
+                ? " 此世界包含 WorldOption.sav / WorldOptions.sav；导入的副本会保留原字节并停用该覆盖文件。" : "") +
+                (observation.UnusualFolderName ? " 导入时会复制到管理器规范目录，原文件夹不会登记。" : "");
             list.Items.Add(new ListViewItem
             {
                 Tag = observation,
@@ -199,12 +276,10 @@ public sealed partial class SaveSelectorWindow : Window
             ? (list.SelectedItem as ListViewItem)?.Tag as WorldObservation : null;
     }
 
-    private async Task<(string Tag, ExistingWorldSettingsChoice Source)?> ChooseImportAsync(
-        SaveSlotRegistry registry, WorldObservation candidate)
+    private async Task<(string? SingleTag, ExistingWorldSettingsChoice Source)?> ChooseImportAsync(
+        SaveSlotRegistry registry, IReadOnlyList<WorldObservation> candidates)
     {
-        var defaultTag = candidate.FolderName.Contains(" - ", StringComparison.Ordinal)
-            ? candidate.FolderName.Split(" - ", 3).Last() : candidate.FolderName;
-        var tag = new TextBox { Header = "管理标签", Text = defaultTag.Length > 40 ? defaultTag[..40] : defaultTag, MaxLength = 40 };
+        var tag = new TextBox { Header = "管理标签", Text = candidates.Count == 1 ? DefaultImportTag(candidates[0]) : "", MaxLength = 40 };
         var sources = new[]
         {
             new ImportSourceOption(ExistingWorldSettingsMode.ActiveProfile, "复制当前存档的设置（推荐）"),
@@ -222,17 +297,20 @@ public sealed partial class SaveSelectorWindow : Window
         source.SelectionChanged += (_, _) => sourceSlot.Visibility = (source.SelectedItem as ImportSourceOption)?.Mode ==
             ExistingWorldSettingsMode.OtherProfile ? Visibility.Visible : Visibility.Collapsed;
         var form = new StackPanel { Spacing = 12 };
-        form.Children.Add(new TextBlock { Text = $"文件夹：{candidate.FolderName}\n世界 UID：{candidate.WorldUid}", TextWrapping = TextWrapping.Wrap });
-        form.Children.Add(tag); form.Children.Add(source); form.Children.Add(sourceSlot);
-        form.Children.Add(new TextBlock { Text = "只登记现有文件夹，不移动或修改游戏存档；不会改动 ServerName、密码、端口或其他全局设置。",
+        form.Children.Add(new TextBlock { Text = candidates.Count == 1
+            ? $"来源：{candidates[0].FolderPath}\n世界 UID：{candidates[0].WorldUid}"
+            : $"已选择 {candidates.Count} 个世界；各自标签取来源文件夹名称，之后可用“修改标签”调整。", TextWrapping = TextWrapping.Wrap });
+        if (candidates.Count == 1) form.Children.Add(tag);
+        form.Children.Add(source); form.Children.Add(sourceSlot);
+        form.Children.Add(new TextBlock { Text = "将复制并校验世界文件，再登记规范停放目录。外部来源保持不变；当前 SaveGames 内的旧来源在成功登记后才会尝试清理。不会改动全局服务器设置。",
             TextWrapping = TextWrapping.Wrap, Foreground = (Brush)Application.Current.Resources["PalMutedTextBrush"] });
-        if (candidate.HasWorldOption)
-            form.Children.Add(new TextBlock { Text = "此世界包含 WorldOption.sav，游戏内世界设置可能覆盖部分服务器设置。",
+        if (candidates.Any(candidate => candidate.HasWorldOption))
+            form.Children.Add(new TextBlock { Text = "检测到 WorldOption.sav / WorldOptions.sav：导入的副本会保留原字节并可逆地停用，外部来源不变。",
                 TextWrapping = TextWrapping.Wrap, Foreground = (Brush)Application.Current.Resources["PalMintBrush"] });
         var dialog = new ContentDialog { XamlRoot = RootGrid.XamlRoot, Title = "导入现有存档", Content = form,
             PrimaryButtonText = "继续", CloseButtonText = "取消", DefaultButton = ContentDialogButton.Close, MinWidth = 520 };
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return null;
-        var validatedTag = SaveSlotService.ValidateTag(tag.Text);
+        var validatedTag = candidates.Count == 1 ? SaveSlotService.ValidateTag(tag.Text) : null;
         var selectedMode = ((ImportSourceOption)source.SelectedItem).Mode;
         ExistingWorldSettingsChoice choice;
         if (selectedMode == ExistingWorldSettingsMode.Custom)
@@ -255,7 +333,7 @@ public sealed partial class SaveSelectorWindow : Window
         }
         else choice = new(selectedMode, SourceSlotId: selectedMode == ExistingWorldSettingsMode.OtherProfile
             ? (sourceSlot.SelectedItem as SaveSlot)?.Id : null);
-        if (!await ShowConfirmationAsync("确认导入", $"将登记文件夹 {candidate.FolderName}\nUID：{candidate.WorldUid}\n标签：{validatedTag}\n设置来源：{((ImportSourceOption)source.SelectedItem).Label}\n\n不会移动或改写游戏存档，也不会修改全局服务器设置。继续吗？")) return null;
+        if (!await ShowConfirmationAsync("确认导入", $"将复制并登记 {candidates.Count} 个世界到当前服务器的规范停放目录。\n设置来源：{((ImportSourceOption)source.SelectedItem).Label}\n\n外部来源不会被修改；当前 SaveGames 内的非规范来源仅在成功登记后清理。不会修改全局服务器设置。继续吗？")) return null;
         return (validatedTag, choice);
     }
 

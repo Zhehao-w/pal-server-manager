@@ -21,9 +21,10 @@ public sealed record WorldObservation(
     WorldDiscoveryStatus Status,
     string Reason,
     bool HasWorldOption = false,
-    bool UnusualFolderName = false)
+    bool UnusualFolderName = false,
+    string? WorldPath = null)
 {
-    public bool CanImport => Status == WorldDiscoveryStatus.Importable && FolderName != "0";
+    public bool CanImport => Status == WorldDiscoveryStatus.Importable;
 }
 
 public enum WorldProfileStatus
@@ -61,3 +62,5 @@ public sealed record ExistingWorldSettingsChoice(
     int? SourceSlotId = null,
     Dictionary<string, string>? CustomValues = null,
     string? ExternalIniPath = null);
+
+public sealed record WorldImportResult(SaveSlot Slot, string? CleanupWarning = null);

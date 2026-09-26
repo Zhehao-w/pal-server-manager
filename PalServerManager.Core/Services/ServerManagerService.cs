@@ -142,9 +142,9 @@ public sealed class ServerManagerService(
         foreach (var conflict in worldOptions.Detect(registry, target.Id))
         {
             var decision = ResolveWorldOptionAsync is null ? WorldOptionDecision.Cancel : await ResolveWorldOptionAsync(conflict);
-            if (decision == WorldOptionDecision.Cancel) throw new OperationCanceledException("检测到 WorldOption 文件，用户取消了启动。");
-            if (decision == WorldOptionDecision.BackupAndDisable) await worldOptions.BackupAndDisableAsync(conflict, ct);
-            worldOptions.Acknowledge(conflict);
+            if (decision != WorldOptionDecision.BackupAndDisable)
+                throw new OperationCanceledException("检测到 WorldOption 文件，用户取消了启动。");
+            await worldOptions.BackupAndDisableAsync(conflict, ct);
         }
         var build = await builds.GetCurrentBuildAsync(ct);
         if (!await builds.NeedsProtectionAsync(target.WorldGuid, build, ct)) return;

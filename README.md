@@ -18,15 +18,17 @@ If PalServer has not yet created a world, start it once outside the Manager, wai
 
 The application, PalServer installation, and Manager state remain separate. Manager registration and state live under `%LOCALAPPDATA%\PalServerManager`; game saves and configuration remain under the PalServer installation. Attaching an existing installation does not modify `SaveGames` or game configuration. Keep your own independent backups of important worlds.
 
-To add an existing world to an already managed server, stop PalServer and manually place its complete world folder directly under that server's `Pal\Saved\SaveGames`. In the save selector, choose **Rescan** to review disk-only worlds and any registry/profile discrepancies, then explicitly **Import** a valid unique-UID candidate. Choose a Manager tag and a World Settings source; import registers the folder in place and does not start the server or alter global server settings. `WorldOption.sav` / `WorldOptions.sav` is reported as a possible world-local settings override, not modified.
+To add an existing world to an already managed server, stop PalServer and choose **Import Save…** in the save selector. Select a SaveGames-like folder, one save container, or a UID world folder; the Manager scans only that level and lets you select one or more valid worlds. Choose a World Settings source (and a tag for a single import). The Manager copies each selected world into a verified canonical `0 - Slot NNN - <tag>` parked folder, then registers it. An external source is never changed. **Rescan** remains read-only: it reports unregistered worlds already inside the current SaveGames and registry/profile discrepancies. Importing one of those disk-only worlds uses the same canonical copy pipeline; only after successful registration does the Manager remove its old noncanonical source if it is unchanged and contains no extra data.
 
-PalServerManager does not move Palworld saves between PCs. If moving to a new PC, copy the PalServer installation and saves yourself, then install the Manager, select `PalServer.exe`, and attach the existing worlds. No prior Manager state is required for that first-time attachment.
+PalServerManager does not transfer Palworld saves between PCs. If moving to a new PC, copy the PalServer installation and saves yourself, then install the Manager and select `PalServer.exe`. First attach adopts only the active `SaveGames\0` world in place, with a reserved canonical parked folder for later switching. Use **Import Save…** for any additional worlds. No prior Manager state is required for that first-time attachment.
 
 ## World safety
 
 Unknown or duplicate world UIDs, incomplete Manager state, and unresolved operations block startup or switching. Switching and rollback use protective snapshots and transaction records.
 
 Rescan is read-only and never repairs discrepancies. Missing or identity-mismatched registered profiles remain fail-closed at startup; recovery of those cases needs explicit identity verification and is not automated by this feature.
+
+PalServerManager's dedicated-server settings policy uses its per-world profile and `PalWorldSettings.ini`. When an imported copy contains `WorldOption.sav` or `WorldOptions.sav`, the Manager preserves its bytes under a reversible `.disabled-…` name in the managed destination before registration; the external source is untouched. First attach does not change the active world, but the first managed start requires backing up and disabling any active WorldOption file or cancelling startup.
 
 **Delete Save** is available only for a registered inactive world while PalServer is stopped and the identity audit is healthy. The Manager first creates and verifies a complete recovery snapshot of the parked world and its world-specific metadata. To delete the active world, first switch another world to active and stop the server. Retain the snapshot if you may need to recover a deleted world.
 

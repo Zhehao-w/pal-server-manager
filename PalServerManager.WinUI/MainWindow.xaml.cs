@@ -171,9 +171,9 @@ public sealed partial class MainWindow : Window
         var panel = new StackPanel { Spacing = 12 };
         panel.Children.Add(new TextBlock { Text = $"检测到 {System.IO.Path.GetFileName(conflict.FilePath)}。它可能覆盖 PalWorldSettings.ini，使游戏实际设置与管理器中保存的设置不同。", TextWrapping = TextWrapping.Wrap, MaxWidth = 560 });
         panel.Children.Add(folder);
-        var dialog = new ContentDialog { XamlRoot = RootGrid.XamlRoot, Title = "检测到世界本地设置文件", Content = panel, PrimaryButtonText = "本次继续", SecondaryButtonText = "备份并停用", CloseButtonText = "取消启动", DefaultButton = ContentDialogButton.Close };
+        var dialog = new ContentDialog { XamlRoot = RootGrid.XamlRoot, Title = "检测到世界本地设置文件", Content = panel, PrimaryButtonText = "备份并停用后启动", CloseButtonText = "取消启动", DefaultButton = ContentDialogButton.Close };
         var result = await dialog.ShowAsync();
-        if (result != ContentDialogResult.Secondary) return result == ContentDialogResult.Primary ? WorldOptionDecision.Continue : WorldOptionDecision.Cancel;
+        if (result != ContentDialogResult.Primary) return WorldOptionDecision.Cancel;
         return await ShowConfirmationAsync("确认备份并停用", "原文件会被可逆地重命名并保留，不会删除。确定继续吗？") ? WorldOptionDecision.BackupAndDisable : WorldOptionDecision.Cancel;
     }
 

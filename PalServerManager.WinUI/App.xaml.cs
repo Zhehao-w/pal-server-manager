@@ -74,7 +74,7 @@ public partial class App : Application
             var journal = new OperationJournalService(context, safeFiles);
             var deletion = new DeleteWorldService(context, processes, slots, identity, backups, safeFiles, journal, logging);
             var discovery = new WorldDiscoveryService(context.ServerPaths, context.StatePaths);
-            var importer = new WorldImportService(context, processes, slots, worldSettings, identity, discovery, journal, logging);
+            var importer = new WorldImportService(context, processes, slots, worldSettings, identity, discovery, worldOptions, journal, logging);
             var manager = new ServerManagerService(context, processes, rest, slots, worldSettings, keepAwake, backups, identity, worldOptions, builds, journal, safeFiles, new PowerService(), logging);
             StartupChoice? startupChoice = null;
             if (!processes.GetSnapshot().IsRunning)
