@@ -18,15 +18,22 @@ var tests = new (string Name, Func<Task> Run)[]
     ("logical cross-volume restore uses only same-volume renames", LogicalCrossVolumeAsync),
     ("server registry and broken-path relocation", RegistryFlowAsync),
     ("existing PalServer worlds attach without modifying saves", ExistingWorldAttachAsync),
-    ("ambiguous world identities and incomplete state fail closed", AttachSafetyAsync),
+    ("incomplete active world and invalid Manager state fail closed", AttachSafetyAsync),
     ("new world waits for its first disk save and rejects wrong UID", NewWorldSaveWaitAsync),
     ("zero-player world can create protection and restore", ZeroPlayerRestoreAsync)
     ,("inactive world deletion snapshots and cleans metadata", DeleteWorldSuccessAsync)
     ,("world deletion refuses unsafe state and preserves originals", DeleteWorldRefusalsAsync)
     ,("world deletion failures restore data and metadata", DeleteWorldFailureAsync)
+    ,("fresh PC attaches manually copied worlds without touching saves", FreshPcAttachAsync)
+    ,("world discovery reports managed, unmanaged, duplicate and incomplete states", WorldDiscoveryAsync)
+    ,("rescan is read-only and profiles reconcile without repair", ReadOnlyRescanAsync)
+    ,("canonical copy import uses monotonic IDs and selected settings", ExistingWorldImportAsync)
+    ,("import refuses unsafe state and rolls back metadata failures", WorldImportRefusalsAsync)
 };
+var selectedTests = args.Length == 0 ? tests : tests.Where(test => args.Any(filter =>
+    test.Name.Contains(filter, StringComparison.OrdinalIgnoreCase))).ToArray();
 var failures = new List<string>();
-foreach (var test in tests)
+foreach (var test in selectedTests)
 {
     Console.WriteLine($"RUN {test.Name}");
     try { await test.Run(); Console.WriteLine($"PASS {test.Name}"); }
@@ -34,11 +41,11 @@ foreach (var test in tests)
 }
 if (failures.Count > 0)
 {
-    Console.Error.WriteLine($"{failures.Count} of {tests.Length} reliability regression groups failed.");
+    Console.Error.WriteLine($"{failures.Count} of {selectedTests.Length} reliability regression groups failed.");
     Environment.ExitCode = 1;
     return;
 }
-Console.WriteLine($"All {tests.Length} reliability regression groups passed.");
+Console.WriteLine($"All {selectedTests.Length} reliability regression groups passed.");
 
 static async Task AtomicJsonAsync()
 {
@@ -457,17 +464,19 @@ static async Task ExistingWorldAttachAsync()
         CreateWorld(active, "active-save"); CreateWorld(parked, "parked-save");
         await WriteSyntheticIniAsync(serverRoot);
         Equal(ServerStateKind.NeedsInitialization, (await service.AssessAsync(server)).Kind);
-        Equal(2, service.DiscoverWorlds(server).Count);
+        Equal(1, service.DiscoverWorlds(server).Count);
         await service.AttachAsync(server);
         Equal(ServerStateKind.Ready, (await service.AssessAsync(server)).Kind);
         var state = ServerStatePaths.ForRegisteredServer(app, server);
         var registry = JsonSerializer.Deserialize<SaveSlotRegistry>(await File.ReadAllTextAsync(state.RegistryPath))!;
-        Equal(2, registry.Slots.Count);
+        Equal(1, registry.Slots.Count);
         Equal(0, registry.ActiveSlotId);
-        Equal(2, registry.Slots.Single(slot => slot.WorldGuid == parkedUid).Id);
-        True(File.Exists(state.WorldProfilePath(0)) && File.Exists(state.WorldProfilePath(2)), "world profiles missing");
+        Equal(SaveSlotService.NewParkedFolderName(0, "世界 0"), registry.Slots.Single().ParkedFolder);
+        True(File.Exists(state.WorldProfilePath(0)), "active world profile missing");
         Equal("active-save", await File.ReadAllTextAsync(Path.Combine(active, "Level.sav")));
         Equal("parked-save", await File.ReadAllTextAsync(Path.Combine(parked, "Level.sav")));
+        var discovered = await new WorldDiscoveryService(new ServerPaths(serverRoot), state).ScanAsync(registry);
+        Equal(WorldDiscoveryStatus.Importable, discovered.Worlds.Single(world => world.WorldUid == parkedUid).Status);
         True(!Directory.Exists(Path.Combine(serverRoot, "Pal", "Saved", "AdminScripts")), "attach created a server-side Manager directory");
 
         // Previously activated state remains readable without its former source directory.
@@ -488,12 +497,18 @@ static async Task AttachSafetyAsync()
         await ThrowsAsync<InvalidOperationException>(() => service.AttachAsync(server));
         const string uid = "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC";
         CreateWorld(Path.Combine(serverRoot, "Pal", "Saved", "SaveGames", "0", uid), "active");
-        CreateWorld(Path.Combine(serverRoot, "Pal", "Saved", "SaveGames", "0 - Slot 001 - Copy", uid), "copy");
+        var extra = Path.Combine(serverRoot, "Pal", "Saved", "SaveGames", "0 - Slot 001 - Copy");
+        CreateWorld(Path.Combine(extra, uid), "copy");
         await WriteSyntheticIniAsync(serverRoot);
+        var activeMeta = Path.Combine(serverRoot, "Pal", "Saved", "SaveGames", "0", uid, "LevelMeta.sav");
+        File.Delete(activeMeta);
         await ThrowsAsync<InvalidOperationException>(() => service.AttachAsync(server));
         var state = ServerStatePaths.ForRegisteredServer(app, server).StateRoot;
-        True(!File.Exists(Path.Combine(state, "StateActivation.json")), "ambiguous world was activated");
-        Directory.Delete(Path.Combine(serverRoot, "Pal", "Saved", "SaveGames", "0 - Slot 001 - Copy"), true);
+        True(!File.Exists(Path.Combine(state, "StateActivation.json")), "incomplete active world was activated");
+        await File.WriteAllTextAsync(activeMeta, "synthetic-meta");
+        // An extra disk folder is not silently adopted or made authoritative on first attach.
+        Equal(1, service.DiscoverWorlds(server).Count);
+        Directory.Delete(extra, true);
         await File.WriteAllTextAsync(Path.Combine(state, "PendingOperation.json"), "{}");
         Equal(ServerStateKind.Interrupted, (await service.AssessAsync(server)).Kind);
         await ThrowsAsync<InvalidOperationException>(() => service.AttachAsync(server));
@@ -530,6 +545,18 @@ static async Task DeleteWorldSuccessAsync()
         True(beforeActive.SequenceEqual(afterActive), "active world changed");
         True(!File.Exists(fixture.Env.Context.StatePaths.PendingOperationPath), "successful delete retained journal");
         await new WorldIdentityAuditService(fixture.Env.Context, fixture.Env.Slots, fixture.Env.WorldSettings).AuditOrThrowAsync(registry);
+    });
+    await InTempAsync(async root =>
+    {
+        var fixture = await CreateDeleteFixtureAsync(root);
+        var noncanonical = Path.Combine(fixture.Env.Context.ServerPaths.SaveRoot, "legitimate-older-folder");
+        Directory.Move(fixture.ParkedPath, noncanonical);
+        var registry = await fixture.Env.Slots.LoadAsync();
+        registry.Slots.Single(slot => slot.Id == 1).ParkedFolder = "legitimate-older-folder";
+        await fixture.Env.Slots.SaveAsync(registry);
+        var snapshot = await CreateDeletion(fixture).DeleteAsync(1);
+        True(Directory.Exists(snapshot) && !Directory.Exists(noncanonical), "noncanonical registered world was not safely deleted");
+        Equal(1, (await fixture.Env.Slots.LoadAsync()).Slots.Count);
     });
 }
 
@@ -667,6 +694,280 @@ static Task WriteSyntheticIniAsync(string serverRoot)
         string.Join(',', SyntheticProfileValues().Select(pair => pair.Key + "=" + pair.Value)) + ")");
 }
 
+static async Task FreshPcAttachAsync()
+{
+    await InTempAsync(async root =>
+    {
+        var serverRoot = Path.Combine(root, "CopiedPalServer"); FakeServer(serverRoot);
+        await WriteSyntheticIniAsync(serverRoot);
+        var saveRoot = Path.Combine(serverRoot, "Pal", "Saved", "SaveGames");
+        const string a = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", b = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
+        var active = Path.Combine(saveRoot, "0", a);
+        var parked = Path.Combine(saveRoot, "0 - Slot 004 - manually copied", b);
+        CreateWorld(active, "copied-active"); CreateWorld(parked, "copied-parked");
+        await File.WriteAllBytesAsync(Path.Combine(parked, "Players", "person_dps.sav"), [1, 7, 9]);
+        var before = SnapshotFiles(saveRoot);
+        var app = AppPaths.ForExplicitRoots(Path.Combine(root, "App"), Path.Combine(root, "FreshState"));
+        True(!File.Exists(app.ServerRegistryPath) && !Directory.Exists(app.ServersStateRoot), "fresh PC already had Manager state");
+        var files = new SafeFileService();
+        var registration = new ServerRegistryService(app, files);
+        var registered = await registration.RegisterFromExeAsync(Path.Combine(serverRoot, "PalServer.exe"), "copied server");
+        Equal(registered.Id, (await registration.LoadAsync()).SelectedServerId!);
+        var service = new ServerStateService(app, files);
+        Equal(1, service.DiscoverWorlds(registered).Count);
+        await service.AttachAsync(registered);
+        Equal(ServerStateKind.Ready, (await new ServerStateService(app, files).AssessAsync(registered)).Kind);
+        var state = ServerStatePaths.ForRegisteredServer(app, registered);
+        var registry = JsonSerializer.Deserialize<SaveSlotRegistry>(await File.ReadAllTextAsync(state.RegistryPath))!;
+        Equal(1, registry.Slots.Count); Equal(a, registry.Slots.Single(slot => slot.Id == registry.ActiveSlotId).WorldGuid);
+        Equal(SaveSlotService.NewParkedFolderName(0, "世界 0"), registry.Slots.Single().ParkedFolder);
+        True(registry.Slots.All(slot => File.Exists(state.WorldProfilePath(slot.Id))), "attached profiles missing");
+        var activeProfile = JsonSerializer.Deserialize<WorldSettingsProfile>(await File.ReadAllTextAsync(state.WorldProfilePath(0)))!;
+        Equal(SyntheticProfileValues()["ExpRate"], activeProfile.Values["ExpRate"]);
+        var report = await new WorldDiscoveryService(new ServerPaths(serverRoot), state).ScanAsync(registry);
+        Equal(WorldDiscoveryStatus.Importable, report.Worlds.Single(world => world.WorldUid == b).Status);
+        EqualFileSnapshots(before, SnapshotFiles(saveRoot));
+    });
+}
+
+static async Task WorldDiscoveryAsync()
+{
+    await InTempAsync(async root =>
+    {
+        var fixture = await CreateDeleteFixtureAsync(root); var env = fixture.Env;
+        var saveRoot = env.Context.ServerPaths.SaveRoot;
+        var discovery = new WorldDiscoveryService(env.Context.ServerPaths, env.Context.StatePaths);
+        var registry = await env.Slots.LoadAsync();
+        var initial = await discovery.ScanAsync(registry);
+        Equal(WorldDiscoveryStatus.RegisteredHealthy, initial.Worlds.Single(world => world.FolderName == "0").Status);
+        Equal(WorldDiscoveryStatus.RegisteredHealthy, initial.Worlds.Single(world => world.FolderName == registry.Slots[1].ParkedFolder).Status);
+        True(initial.Profiles.All(profile => profile.Status == WorldProfileStatus.ProfileHealthy), "healthy profiles not recognized");
+        const string c = "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC", d = "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD";
+        var extra = Path.Combine(saveRoot, "manual-extra"); CreateWorld(Path.Combine(extra, c), "extra");
+        await File.WriteAllTextAsync(Path.Combine(extra, c, "WorldOption.sav"), "option");
+        var report = await discovery.ScanAsync(registry);
+        var candidate = report.Worlds.Single(world => world.FolderName == "manual-extra");
+        Equal(WorldDiscoveryStatus.Importable, candidate.Status);
+        True(candidate.CanImport && candidate.HasWorldOption && candidate.UnusualFolderName, "world option or import flag missing");
+        CreateWorld(Path.Combine(saveRoot, "duplicate-registered", fixture.ActiveUid), "duplicate");
+        CreateWorld(Path.Combine(saveRoot, "duplicate-unknown", c), "duplicate");
+        report = await discovery.ScanAsync(registry);
+        Equal(WorldDiscoveryStatus.DuplicateUid, report.Worlds.Single(world => world.FolderName == "duplicate-registered").Status);
+        Equal(WorldDiscoveryStatus.DuplicateUid, report.Worlds.Single(world => world.FolderName == "manual-extra").Status);
+        Equal(WorldDiscoveryStatus.DuplicateUid, report.Worlds.Single(world => world.FolderName == "duplicate-unknown").Status);
+        var incomplete = Path.Combine(saveRoot, "incomplete"); CreateWorld(Path.Combine(incomplete, d), "incomplete");
+        File.Delete(Path.Combine(incomplete, d, "LevelMeta.sav"));
+        var ambiguous = Path.Combine(saveRoot, "ambiguous"); CreateWorld(Path.Combine(ambiguous, d), "first");
+        CreateWorld(Path.Combine(ambiguous, "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE"), "second");
+        CreateWorld(Path.Combine(saveRoot, ".pal-switch-evidence", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"), "ignored");
+        CreateWorld(Path.Combine(extra, c, "backup", "world", "11111111111111111111111111111111"), "native backup");
+        report = await discovery.ScanAsync(registry);
+        Equal(WorldDiscoveryStatus.Incomplete, report.Worlds.Single(world => world.FolderName == "incomplete").Status);
+        Equal(WorldDiscoveryStatus.Incomplete, report.Worlds.Single(world => world.FolderName == "ambiguous").Status);
+        True(report.Worlds.All(world => !world.FolderName.StartsWith(".pal-", StringComparison.Ordinal)), "transaction artifact discovered");
+        True(report.Worlds.All(world => world.WorldUid != "11111111111111111111111111111111"), "nested backup discovered");
+        var parkedMeta = Path.Combine(fixture.ParkedPath, fixture.ParkedUid, "LevelMeta.sav");
+        File.Delete(parkedMeta);
+        report = await discovery.ScanAsync(registry);
+        Equal(WorldDiscoveryStatus.RegisteredIncomplete, report.Worlds.Single(world => world.SlotId == 1).Status);
+        await File.WriteAllTextAsync(parkedMeta, "synthetic-meta");
+        Directory.Delete(fixture.ParkedPath, true);
+        report = await discovery.ScanAsync(registry);
+        Equal(WorldDiscoveryStatus.RegisteredMissing, report.Worlds.Single(world => world.SlotId == 1).Status);
+        CreateWorld(Path.Combine(fixture.ParkedPath, d), "wrong world");
+        report = await discovery.ScanAsync(registry);
+        Equal(WorldDiscoveryStatus.RegisteredIdentityMismatch, report.Worlds.Single(world => world.SlotId == 1).Status);
+        True(!report.Worlds.Single(world => world.SlotId == 1).CanImport, "mismatched registered world offered for import");
+        Directory.Delete(env.Context.ServerPaths.ActivePath, true);
+        CreateWorld(Path.Combine(env.Context.ServerPaths.ActivePath, d), "wrong active world");
+        report = await discovery.ScanAsync(registry);
+        Equal(WorldDiscoveryStatus.RegisteredIdentityMismatch, report.Worlds.Single(world => world.FolderName == "0").Status);
+        True(report.Worlds.All(world => world.FolderName != "0" || !world.CanImport), "mismatched active world offered for import");
+    });
+}
+
+static async Task ReadOnlyRescanAsync()
+{
+    await InTempAsync(async root =>
+    {
+        var fixture = await CreateDeleteFixtureAsync(root); var env = fixture.Env;
+        var discovery = new WorldDiscoveryService(env.Context.ServerPaths, env.Context.StatePaths);
+        var registry = await env.Slots.LoadAsync();
+        var beforeSaves = SnapshotFiles(env.Context.ServerPaths.SaveRoot);
+        var beforeState = SnapshotFiles(env.Context.StatePaths.StateRoot);
+        var first = await discovery.ScanAsync(registry); var second = await discovery.ScanAsync(registry);
+        Equal(string.Join('|', first.Worlds.Select(world => world.Status)), string.Join('|', second.Worlds.Select(world => world.Status)));
+        EqualFileSnapshots(beforeSaves, SnapshotFiles(env.Context.ServerPaths.SaveRoot));
+        EqualFileSnapshots(beforeState, SnapshotFiles(env.Context.StatePaths.StateRoot));
+        var profilePath = env.Context.StatePaths.WorldProfilePath(1);
+        File.Delete(profilePath);
+        Equal(WorldProfileStatus.ProfileMissing, (await discovery.ScanAsync(registry)).Profiles.Single(profile => profile.SlotId == 1).Status);
+        await File.WriteAllTextAsync(profilePath, "{broken");
+        Equal(WorldProfileStatus.ProfileInvalid, (await discovery.ScanAsync(registry)).Profiles.Single(profile => profile.SlotId == 1).Status);
+        await WriteProfileAsync(env, registry.Slots[1], "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC");
+        Equal(WorldProfileStatus.ProfileIdentityMismatch, (await discovery.ScanAsync(registry)).Profiles.Single(profile => profile.SlotId == 1).Status);
+        var orphan = env.Context.StatePaths.WorldProfilePath(99);
+        await File.WriteAllTextAsync(orphan, "{}");
+        Equal(WorldProfileStatus.OrphanProfile, (await discovery.ScanAsync(registry)).Profiles.Single(profile => profile.Path == orphan).Status);
+        True(File.Exists(profilePath) && File.Exists(orphan), "rescan repaired or deleted profiles");
+    });
+}
+
+static async Task ExistingWorldImportAsync()
+{
+    await InTempAsync(async root =>
+    {
+        var fixture = await CreateDeleteFixtureAsync(root); var env = fixture.Env;
+        var registry = await env.Slots.LoadAsync(); registry.NextSlotId = 3; await env.Slots.SaveAsync(registry);
+        await WriteSyntheticIniAsync(env.Context.ServerPaths.ServerRoot);
+        var runtime = await PalWorldIniDocument.LoadAsync(env.Context.ServerPaths.SettingsPath);
+        runtime.SetValue("ExpRate", "7.000000"); await runtime.WriteAtomicAsync(env.Context.ServerPaths.SettingsPath);
+        var defaultIni = Path.Combine(env.Context.ServerPaths.ServerRoot, "DefaultPalWorldSettings.ini");
+        File.Copy(env.Context.ServerPaths.SettingsPath, defaultIni);
+        var defaults = await PalWorldIniDocument.LoadAsync(defaultIni); defaults.SetValue("ExpRate", "9.000000");
+        await defaults.WriteAtomicAsync(defaultIni);
+        var external = Path.Combine(root, "other-PalWorldSettings.ini"); File.Copy(defaultIni, external);
+        var other = await PalWorldIniDocument.LoadAsync(external); other.SetValue("ExpRate", "11.000000");
+        await other.WriteAtomicAsync(external);
+        var sourceProfile = JsonSerializer.Deserialize<WorldSettingsProfile>(await File.ReadAllTextAsync(env.Context.StatePaths.WorldProfilePath(1)))!;
+        sourceProfile.Values["ExpRate"] = "5.000000";
+        await env.Files.WriteJsonAsync(env.Context.StatePaths.WorldProfilePath(1), sourceProfile);
+        var discovery = new WorldDiscoveryService(env.Context.ServerPaths, env.Context.StatePaths);
+        var importer = NewImporter(env, discovery);
+        var originalActive = SnapshotFiles(env.Context.ServerPaths.ActivePath);
+        var originalParked = SnapshotFiles(fixture.ParkedPath);
+        var runtimeBefore = await File.ReadAllBytesAsync(env.Context.ServerPaths.SettingsPath);
+        var custom = SyntheticProfileValues(); custom["ExpRate"] = "13.000000";
+        var externalRoot = Path.Combine(root, "old-server", "SaveGames");
+        var cases = new (string Uid, ExistingWorldSettingsChoice Choice, string ExpectedRate)[]
+        {
+            ("CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC", new(ExistingWorldSettingsMode.ActiveProfile), SyntheticProfileValues()["ExpRate"]),
+            ("DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD", new(ExistingWorldSettingsMode.OtherProfile, SourceSlotId: 1), "5.000000"),
+            ("EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE", new(ExistingWorldSettingsMode.CurrentServerIni), "7.000000"),
+            ("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", new(ExistingWorldSettingsMode.GameDefaults), "9.000000"),
+            ("11111111111111111111111111111111", new(ExistingWorldSettingsMode.Custom, CustomValues: custom), "13.000000"),
+            ("22222222222222222222222222222222", new(ExistingWorldSettingsMode.ExternalIni, ExternalIniPath: external), "11.000000")
+        };
+        for (var index = 0; index < cases.Length; index++)
+        {
+            var item = cases[index];
+            var sourceContainer = index == 0
+                ? Path.Combine(env.Context.ServerPaths.SaveRoot, "manual-extra")
+                : Path.Combine(externalRoot, index == 1 ? "0" : $"old-world-{index}");
+            var world = Path.Combine(sourceContainer, item.Uid);
+            CreateWorld(world, "import-data-" + index);
+            await File.WriteAllBytesAsync(Path.Combine(world, "Players", "person_dps.sav"), [3, 4, 5, (byte)index]);
+            if (index == 1) await File.WriteAllTextAsync(Path.Combine(world, "WorldOption.sav"), "option-data");
+            var before = SnapshotFiles(world);
+            var registryBeforeScan = await File.ReadAllBytesAsync(env.Context.StatePaths.RegistryPath);
+            var selection = index == 3 ? world : sourceContainer; // direct UID selection is also supported.
+            var report = await discovery.ScanSourceAsync(selection, await env.Slots.LoadAsync());
+            Equal(WorldDiscoveryStatus.Importable, report.Worlds.Single().Status);
+            var registryAfterScan = await File.ReadAllBytesAsync(env.Context.StatePaths.RegistryPath);
+            True(registryBeforeScan.SequenceEqual(registryAfterScan), "rescan auto-registered world");
+            var result = await importer.ImportAsync(selection, item.Uid, "tag-" + index, item.Choice);
+            var slot = result.Slot;
+            Equal(index + 3, slot.Id);
+            Equal(SaveSlotService.NewParkedFolderName(slot.Id, slot.Tag), slot.ParkedFolder);
+            Equal(item.ExpectedRate, (await env.WorldSettings.LoadProfileAsync(slot.Id, item.Uid)).Values["ExpRate"]);
+            var destinationWorld = Path.Combine(env.Context.ServerPaths.SaveRoot, slot.ParkedFolder, item.Uid);
+            if (index == 1)
+            {
+                var disabled = Directory.EnumerateFiles(destinationWorld, "WorldOption.sav.disabled-*").Single();
+                Equal("option-data", await File.ReadAllTextAsync(disabled));
+                True(!File.Exists(Path.Combine(destinationWorld, "WorldOption.sav")), "imported WorldOption remains active");
+                var copied = SnapshotFiles(destinationWorld);
+                foreach (var file in before.Where(file => file.Key != "WorldOption.sav"))
+                    True(copied.TryGetValue(file.Key, out var hash) && hash == file.Value, "imported file changed: " + file.Key);
+            }
+            else EqualFileSnapshots(before, SnapshotFiles(destinationWorld));
+            if (index == 0) True(!Directory.Exists(sourceContainer), "old noncanonical in-server source was not cleaned");
+            else EqualFileSnapshots(before, SnapshotFiles(world));
+            True(result.CleanupWarning is null, "unexpected import cleanup warning");
+            EqualFileSnapshots(originalActive, SnapshotFiles(env.Context.ServerPaths.ActivePath));
+            EqualFileSnapshots(originalParked, SnapshotFiles(fixture.ParkedPath));
+            var runtimeAfter = await File.ReadAllBytesAsync(env.Context.ServerPaths.SettingsPath);
+            True(runtimeBefore.SequenceEqual(runtimeAfter), "import changed global/runtime INI");
+            var after = await env.Slots.LoadAsync();
+            Equal(index + 4, after.NextSlotId);
+            True(after.Slots.Any(existing => existing.Id == 0 && existing.WorldGuid == fixture.ActiveUid) &&
+                 after.Slots.Any(existing => existing.Id == 1 && existing.WorldGuid == fixture.ParkedUid), "existing slots changed");
+        }
+        CreateWorld(Path.Combine(externalRoot, "another-0", "33333333333333333333333333333333"), "batch-a");
+        CreateWorld(Path.Combine(externalRoot, "another-1", "44444444444444444444444444444444"), "batch-b");
+        CreateWorld(Path.Combine(externalRoot, "backup", "55555555555555555555555555555555"), "ignored-history");
+        var batch = await discovery.ScanSourceAsync(externalRoot, await env.Slots.LoadAsync());
+        Equal(2, batch.ImportableCount);
+        True(batch.Worlds.All(world => world.FolderName != "backup"), "source scan descended into backup history");
+        var retainedSource = Path.Combine(env.Context.ServerPaths.SaveRoot, "manual-with-extra");
+        const string retainedUid = "66666666666666666666666666666666";
+        CreateWorld(Path.Combine(retainedSource, retainedUid), "retained-source");
+        await File.WriteAllTextAsync(Path.Combine(retainedSource, "unrelated-note.txt"), "keep me");
+        var retained = await importer.ImportAsync(retainedSource, retainedUid, "retained", new(ExistingWorldSettingsMode.ActiveProfile));
+        True(retained.CleanupWarning is not null && Directory.Exists(retainedSource), "extra source content was silently deleted");
+        True(File.Exists(Path.Combine(env.Context.ServerPaths.SaveRoot, retained.Slot.ParkedFolder, retainedUid, "Level.sav")),
+            "successful canonical copy was rolled back because old source was retained");
+    });
+}
+
+static async Task WorldImportRefusalsAsync()
+{
+    await InTempAsync(async root =>
+    {
+        var fixture = await CreateDeleteFixtureAsync(root); var env = fixture.Env;
+        var discovery = new WorldDiscoveryService(env.Context.ServerPaths, env.Context.StatePaths);
+        const string uid = "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC";
+        var folder = Path.Combine(env.Context.ServerPaths.SaveRoot, "manual-candidate");
+        var world = Path.Combine(folder, uid); CreateWorld(world, "candidate");
+        var originalFiles = SnapshotFiles(folder);
+        var registryBefore = await File.ReadAllBytesAsync(env.Context.StatePaths.RegistryPath);
+        var choice = new ExistingWorldSettingsChoice(ExistingWorldSettingsMode.ActiveProfile);
+        await ThrowsAsync<InvalidOperationException>(() => NewImporter(env, discovery, running: () => true).ImportAsync(folder, uid, "tag", choice));
+        await File.WriteAllTextAsync(env.Context.StatePaths.PendingOperationPath, "{}");
+        await ThrowsAsync<InvalidOperationException>(() => NewImporter(env, discovery).ImportAsync(folder, uid, "tag", choice));
+        File.Delete(env.Context.StatePaths.PendingOperationPath);
+        await ThrowsAsync<InvalidOperationException>(() => NewImporter(env, discovery).ImportAsync(folder, "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD", "tag", choice));
+        CreateWorld(Path.Combine(env.Context.ServerPaths.SaveRoot, "duplicate-candidate", uid), "copy");
+        await ThrowsAsync<InvalidOperationException>(() => NewImporter(env, discovery).ImportAsync(folder, uid, "tag", choice));
+        Directory.Delete(Path.Combine(env.Context.ServerPaths.SaveRoot, "duplicate-candidate"), true);
+        File.Delete(Path.Combine(world, "LevelMeta.sav"));
+        await ThrowsAsync<InvalidOperationException>(() => NewImporter(env, discovery).ImportAsync(folder, uid, "tag", choice));
+        await File.WriteAllTextAsync(Path.Combine(world, "LevelMeta.sav"), "synthetic-meta");
+        await ThrowsAsync<InvalidOperationException>(() => NewImporter(env, discovery).ImportAsync(folder, uid, " ", choice));
+        foreach (var failure in new[] { WorldImportCheckpoint.BeforeProfileWrite, WorldImportCheckpoint.BeforeRegistryCommit })
+        {
+            var importer = NewImporter(env, discovery, checkpoint: point => { if (point == failure) throw new IOException("synthetic metadata fault"); });
+            await ThrowsAsync<IOException>(() => importer.ImportAsync(folder, uid, "tag", choice));
+            var registryAfterFailure = await File.ReadAllBytesAsync(env.Context.StatePaths.RegistryPath);
+            True(registryBefore.SequenceEqual(registryAfterFailure), "failed import changed registry");
+            True(!File.Exists(env.Context.StatePaths.WorldProfilePath(2)), "failed import left active profile");
+            True(!File.Exists(env.Context.StatePaths.PendingOperationPath), "failed import left transaction despite verified rollback");
+        }
+        EqualFileSnapshots(originalFiles, SnapshotFiles(folder));
+        True(!Directory.EnumerateDirectories(env.Context.ServerPaths.SaveRoot, ".pal-import-*").Any(), "failed import left staging content");
+        True(!Directory.Exists(Path.Combine(env.Context.ServerPaths.SaveRoot, SaveSlotService.NewParkedFolderName(2, "tag"))),
+            "failed import left canonical destination");
+    });
+}
+
+static WorldImportService NewImporter(TestEnvironment env, WorldDiscoveryService discovery,
+    Action<WorldImportCheckpoint>? checkpoint = null, Func<bool>? running = null) =>
+    new(env.Context, env.Processes, env.Slots, env.WorldSettings,
+        new WorldIdentityAuditService(env.Context, env.Slots, env.WorldSettings), discovery,
+        new WorldOptionService(env.Slots, env.Log), new OperationJournalService(env.Context, env.Files), env.Log, checkpoint, running);
+
+static Dictionary<string, string> SnapshotFiles(string root) => Directory.Exists(root)
+    ? Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)
+        .ToDictionary(path => Path.GetRelativePath(root, path), path => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path))),
+            StringComparer.OrdinalIgnoreCase)
+    : new(StringComparer.OrdinalIgnoreCase);
+
+static void EqualFileSnapshots(Dictionary<string, string> expected, Dictionary<string, string> actual)
+{
+    Equal(expected.Count, actual.Count);
+    foreach (var item in expected) True(actual.TryGetValue(item.Key, out var hash) && hash == item.Value, "file changed: " + item.Key);
+}
+
 static void FakeServer(string path)
 {
     Directory.CreateDirectory(Path.Combine(path, "Pal", "Saved"));
@@ -712,7 +1013,7 @@ static SaveSlotRegistry Registry(string uid0, string uid1) => new()
 };
 
 static void CreateWorld(string path, string level)
-{ Directory.CreateDirectory(Path.Combine(path, "Players")); File.WriteAllText(Path.Combine(path, "Level.sav"), level); }
+{ Directory.CreateDirectory(Path.Combine(path, "Players")); File.WriteAllText(Path.Combine(path, "Level.sav"), level); File.WriteAllText(Path.Combine(path, "LevelMeta.sav"), "synthetic-meta"); }
 
 static Task WriteProfileAsync(TestEnvironment env, SaveSlot slot, string uid)
 {

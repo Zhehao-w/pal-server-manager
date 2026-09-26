@@ -14,14 +14,18 @@ public static class WorldSettingsEditorDialog
         WorldSettingsEditorSession session,
         WorldSettingsService service,
         bool serverRunning,
-        bool allowRestart)
+        bool allowRestart,
+        bool includeGlobalSettings = true,
+        bool existingWorldImport = false)
     {
         var values = new Dictionary<string, string>(session.ProfileValues, StringComparer.OrdinalIgnoreCase);
         var globals = new Dictionary<string, string>(session.GlobalValues, StringComparer.OrdinalIgnoreCase);
         var controls = new Dictionary<string, Control>(StringComparer.OrdinalIgnoreCase);
         var status = new TextBlock
         {
-            Text = session.IsDraft
+            Text = existingWorldImport
+                ? "只准备导入世界的管理设置档；不会修改存档或服务器全局设置。"
+                : session.IsDraft
                 ? "这些设置会在新世界第一次生成前应用。"
                 : serverRunning ? "修改将在服务器下次启动后生效。" : "保存后，将在下次启动此存档时生效。",
             Foreground = Brush("PalMintBrush"),
@@ -32,13 +36,15 @@ public static class WorldSettingsEditorDialog
         var body = new StackPanel { Spacing = 12 };
         body.Children.Add(new TextBlock
         {
-            Text = session.IsDraft ? "新存档 · 自定义世界设置" : $"存档 {session.SlotId} · {session.Tag}",
+            Text = existingWorldImport ? "导入现有存档 · 自定义世界设置" : session.IsDraft ? "新存档 · 自定义世界设置" : $"存档 {session.SlotId} · {session.Tag}",
             FontSize = 20,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
         });
         body.Children.Add(new TextBlock
         {
-            Text = "每个存档的设置分别保存在 JSON 配置档中。服务器名称等位于最下方的全局区域，不会进入存档配置。",
+            Text = includeGlobalSettings
+                ? "每个存档的设置分别保存在 JSON 配置档中。服务器名称等位于最下方的全局区域，不会进入存档配置。"
+                : "仅编辑此存档的世界设置。ServerName、密码、端口等全局设置不会导入或改动。",
             Foreground = Brush("PalMutedTextBrush"),
             TextWrapping = TextWrapping.Wrap,
             FontSize = 12
@@ -49,8 +55,9 @@ public static class WorldSettingsEditorDialog
             var definitions = WorldSettingsService.ProfileDefinitions.Where(item => item.Category == category).ToArray();
             body.Children.Add(BuildCategory(category, definitions, values, controls));
         }
-        body.Children.Add(BuildCategory("服务器（全局共享）", WorldSettingsService.GlobalDefinitions, globals, controls,
-            "这些值由所有存档共享；管理器不会把它们写入任何存档 profile。AdminPassword、REST、端口和 RCON 不在此处管理。"));
+        if (includeGlobalSettings)
+            body.Children.Add(BuildCategory("服务器（全局共享）", WorldSettingsService.GlobalDefinitions, globals, controls,
+                "这些值由所有存档共享；管理器不会把它们写入任何存档 profile。AdminPassword、REST、端口和 RCON 不在此处管理。"));
 
         var utility = new Grid { ColumnSpacing = 8 };
         utility.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -115,7 +122,7 @@ public static class WorldSettingsEditorDialog
             try
             {
                 var profileResult = ReadControls(WorldSettingsService.ProfileDefinitions, controls);
-                var globalResult = ReadControls(WorldSettingsService.GlobalDefinitions, controls);
+                var globalResult = includeGlobalSettings ? ReadControls(WorldSettingsService.GlobalDefinitions, controls) : globals;
                 result = new WorldSettingsEditorResult(profileResult, globalResult, restart);
             }
             catch (Exception exception)

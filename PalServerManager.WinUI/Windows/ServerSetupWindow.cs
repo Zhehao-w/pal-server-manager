@@ -117,7 +117,7 @@ public sealed class ServerSetupWindow : Window
             var selected = SelectedServer(); if (selected is null) return;
             var discovered = _serverState.DiscoverWorlds(selected);
             if (!await ConfirmAsync("接入现有 PalServer",
-                $"将登记发现的 {discovered.Count} 个世界，并为它们建立管理设置。首次接入时，各世界的设置以当前 PalWorldSettings.ini 为起点，之后可分别调整。不会修改 SaveGames 或游戏配置。")) return;
+                $"将只接入当前 SaveGames\\0 的 {discovered.Count} 个世界，并以当前 PalWorldSettings.ini 初始化它的管理设置。其他世界以后可使用“导入存档…”加入。接入不会修改 SaveGames 或游戏配置。")) return;
             _status.Text = "正在建立并验证管理状态…";
             await Task.Run(() => _serverState.AttachAsync(selected));
             await AssessSelectedAsync();
@@ -171,8 +171,8 @@ public sealed class ServerSetupWindow : Window
             var discovered = _serverState.DiscoverWorlds(server);
             _summary.Text = discovered.Count == 0
                 ? "未找到现有世界。请先单独启动 PalServer.exe，待首个世界存盘后关服，再点“重新检查”。"
-                : $"已发现 {discovered.Count} 个世界（含当前世界）；接入后可分别管理。";
-            _attach.Content = $"接入 {discovered.Count} 个现有世界";
+                : "已发现当前世界 SaveGames\\0；其他存档可在接入后显式导入。";
+            _attach.Content = "接入当前世界";
             _attach.IsEnabled = discovered.Count > 0;
         }
         _relocate.IsEnabled = _remove.IsEnabled = true;

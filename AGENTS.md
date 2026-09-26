@@ -15,7 +15,8 @@ diagnostics; a Work launch is not evidence of desktop production state.
 Do not activate Manager state without a matching registered server,
 `StateActivation.json`, complete validation, and matching world identities.
 Existing-server attachment must not modify SaveGames or game configuration.
-Unknown or duplicate world UIDs fail closed. Preserve `PendingOperation`
+Ambiguous registered world identities and duplicate selected import UIDs fail
+closed. Preserve `PendingOperation`
 blocking, atomic JSON writes, transactional switching, complete hash-verified
 protective snapshots, and byte-for-byte `*_dps.sav` preservation. Do not use
 cross-volume directory moves to store backups.
@@ -26,6 +27,16 @@ mutation, preserve a complete hash-verified snapshot of the parked folder and
 slot-bound Manager metadata. Record the transaction, roll back on ordinary
 failures, and retain the journal and snapshot if recovery cannot be verified.
 Never delete active SaveGames\\0 through this feature.
+
+Discovery is read-only; registration/import is explicit; reconciliation never
+guesses authority. First attach adopts only the active SaveGames\\0 world in
+place. Import copies a complete, unique source world to a verified canonical
+parked folder after fresh validation and an explicit per-world settings source
+choice. External sources remain untouched; an unregistered source inside the
+current SaveGames is cleaned only after successful registration. Import must
+not silently change global server settings or the original source data.
+Keep missing/mismatched registered profiles fail-closed rather than weakening
+startup authority to make a repair UI reachable.
 
 Do not commit real saves, game Config, Manager runtime JSON, passwords, player
 identities, world UIDs, logs, backups, or local recovery evidence. Review the

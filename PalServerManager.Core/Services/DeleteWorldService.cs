@@ -30,8 +30,7 @@ public sealed class DeleteWorldService(
             await identity.AuditOrThrowAsync(registry, cancellationToken: cancellationToken);
             if (slotId == registry.ActiveSlotId) throw new InvalidOperationException("不能删除当前存档；请先切换其他世界并关闭服务器。");
             var slot = slots.GetSlot(registry, slotId);
-            if (!slot.ParkedFolder.StartsWith($"0 - Slot {slot.Id:D3} - ", StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("所选世界不是管理器停放的存档，已拒绝删除。");
+            PathSafety.RequireChildName(slot.ParkedFolder);
             var source = PathSafety.RequireInside(context.ServerPaths.SaveRoot, slots.GetSlotPath(registry, slotId));
             if (!Directory.Exists(source)) throw new DirectoryNotFoundException($"找不到停放存档：{source}");
             BackupService.RejectReparsePoints(source);
