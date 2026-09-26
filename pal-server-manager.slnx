@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="PalServerManager.Core/PalServerManager.Core.csproj" />
+  <Project Path="PalServerManager.WinUI/PalServerManager.WinUI.csproj" />
+  <Project Path="PalServerManager.RegressionTests/PalServerManager.RegressionTests.csproj" />
+  <Project Path="PalServer-KeepAwake.Native/PalServer-KeepAwake.Native.csproj" />
+</Solution>

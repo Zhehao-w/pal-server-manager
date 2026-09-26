@@ -1,0 +1,154 @@
+<Application
+    x:Class="HaoHaoTianTian.PalHR.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    RequestedTheme="Dark">
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+      </ResourceDictionary.MergedDictionaries>
+
+      <Color x:Key="PalBackgroundColor">#18242C</Color>
+      <Color x:Key="PalCardColor">#E621313A</Color>
+      <Color x:Key="PalCardAltColor">#E6243741</Color>
+      <Color x:Key="PalBorderColor">#304A54</Color>
+      <Color x:Key="PalCyanColor">#39C6D8</Color>
+      <Color x:Key="PalMintColor">#68D7C3</Color>
+      <Color x:Key="PalTextColor">#F2F7F8</Color>
+      <Color x:Key="PalMutedTextColor">#AEBFC4</Color>
+      <Color x:Key="PalWarmColor">#D5A65A</Color>
+      <Color x:Key="PalDangerColor">#C65A64</Color>
+
+      <SolidColorBrush x:Key="PalBackgroundBrush" Color="{StaticResource PalBackgroundColor}" />
+      <SolidColorBrush x:Key="PalCardBrush" Color="{StaticResource PalCardColor}" />
+      <SolidColorBrush x:Key="PalCardAltBrush" Color="{StaticResource PalCardAltColor}" />
+      <SolidColorBrush x:Key="PalBorderBrush" Color="{StaticResource PalBorderColor}" />
+      <SolidColorBrush x:Key="PalCyanBrush" Color="{StaticResource PalCyanColor}" />
+      <SolidColorBrush x:Key="PalMintBrush" Color="{StaticResource PalMintColor}" />
+      <SolidColorBrush x:Key="PalTextBrush" Color="{StaticResource PalTextColor}" />
+      <SolidColorBrush x:Key="PalMutedTextBrush" Color="{StaticResource PalMutedTextColor}" />
+      <SolidColorBrush x:Key="PalWarmBrush" Color="{StaticResource PalWarmColor}" />
+      <SolidColorBrush x:Key="PalDangerBrush" Color="{StaticResource PalDangerColor}" />
+
+      <Style x:Key="CardStyle" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource PalCardBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource PalBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="16" />
+      </Style>
+
+      <Style x:Key="MetricLabelStyle" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{StaticResource PalMutedTextBrush}" />
+        <Setter Property="FontSize" Value="12" />
+      </Style>
+
+      <Style x:Key="MetricValueStyle" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{StaticResource PalTextBrush}" />
+        <Setter Property="FontSize" Value="17" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+      </Style>
+
+      <Style x:Key="TableHeaderTextStyle" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{StaticResource PalMutedTextBrush}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+      </Style>
+
+      <Style x:Key="TableCellTextStyle" TargetType="TextBlock">
+        <Setter Property="VerticalAlignment" Value="Center" />
+      </Style>
+
+      <Style x:Key="ColoredPalButtonBaseStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+        <Setter Property="MinHeight" Value="32" />
+        <Setter Property="Padding" Value="12,6" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="UseSystemFocusVisuals" Value="False" />
+        <Setter Property="Template">
+          <Setter.Value>
+            <ControlTemplate TargetType="Button">
+              <Grid x:Name="Root" Background="Transparent">
+                <VisualStateManager.VisualStateGroups>
+                  <VisualStateGroup x:Name="CommonStates">
+                    <VisualStateGroup.Transitions>
+                      <VisualTransition To="PointerOver" GeneratedDuration="0:0:0.10" />
+                      <VisualTransition To="Pressed" GeneratedDuration="0:0:0.05" />
+                      <VisualTransition To="Normal" GeneratedDuration="0:0:0.14" />
+                    </VisualStateGroup.Transitions>
+                    <VisualState x:Name="Normal" />
+                    <VisualState x:Name="PointerOver">
+                      <VisualState.Setters>
+                        <Setter Target="HoverLayer.Opacity" Value="1" />
+                        <Setter Target="ContentHost.Opacity" Value="1" />
+                      </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="Pressed">
+                      <VisualState.Setters>
+                        <Setter Target="PressedLayer.Opacity" Value="1" />
+                        <Setter Target="ContentHost.Opacity" Value="0.92" />
+                      </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="Disabled">
+                      <VisualState.Setters>
+                        <Setter Target="Root.Opacity" Value="0.42" />
+                      </VisualState.Setters>
+                    </VisualState>
+                  </VisualStateGroup>
+                  <VisualStateGroup x:Name="FocusStates">
+                    <VisualState x:Name="Unfocused" />
+                    <VisualState x:Name="Focused">
+                      <VisualState.Setters><Setter Target="FocusLayer.Opacity" Value="1" /></VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="PointerFocused" />
+                  </VisualStateGroup>
+                </VisualStateManager.VisualStateGroups>
+                <Border
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="6" />
+                <Border x:Name="HoverLayer" Background="#16FFFFFF" BorderBrush="#38FFFFFF" BorderThickness="1" CornerRadius="6" Opacity="0" IsHitTestVisible="False" />
+                <Border x:Name="PressedLayer" Background="#18000000" BorderBrush="#52FFFFFF" BorderThickness="1" CornerRadius="6" Opacity="0" IsHitTestVisible="False" />
+                <Border x:Name="FocusLayer" BorderBrush="#D9FFFFFF" BorderThickness="2" CornerRadius="6" Opacity="0" IsHitTestVisible="False" />
+                <ContentPresenter
+                    x:Name="ContentHost"
+                    Content="{TemplateBinding Content}"
+                    ContentTemplate="{TemplateBinding ContentTemplate}"
+                    Foreground="{TemplateBinding Foreground}"
+                    FontFamily="{TemplateBinding FontFamily}"
+                    FontSize="{TemplateBinding FontSize}"
+                    FontWeight="{TemplateBinding FontWeight}"
+                    Padding="{TemplateBinding Padding}"
+                    HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                    VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+              </Grid>
+            </ControlTemplate>
+          </Setter.Value>
+        </Setter>
+      </Style>
+
+      <Style x:Key="PrimaryPalButtonStyle" TargetType="Button" BasedOn="{StaticResource ColoredPalButtonBaseStyle}">
+        <Setter Property="Background" Value="{StaticResource PalCyanBrush}" />
+        <Setter Property="Foreground" Value="#10242A" />
+        <Setter Property="BorderBrush" Value="#70DCE7" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+      </Style>
+
+      <Style x:Key="MaintenanceButtonStyle" TargetType="Button" BasedOn="{StaticResource ColoredPalButtonBaseStyle}">
+        <Setter Property="Background" Value="#403A32" />
+        <Setter Property="Foreground" Value="#F3CF9C" />
+        <Setter Property="BorderBrush" Value="#6D604E" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+      </Style>
+
+      <Style x:Key="DangerButtonStyle" TargetType="Button" BasedOn="{StaticResource ColoredPalButtonBaseStyle}">
+        <Setter Property="Background" Value="#3D2D32" />
+        <Setter Property="Foreground" Value="#FFB4AB" />
+        <Setter Property="BorderBrush" Value="#76505A" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+      </Style>
+    </ResourceDictionary>
+  </Application.Resources>
+</Application>

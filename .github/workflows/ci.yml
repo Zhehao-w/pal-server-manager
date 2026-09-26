@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-test-publish:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Restore
+        run: dotnet restore .\pal-server-manager.slnx
+      - name: Release x64 build
+        run: dotnet build .\pal-server-manager.slnx -c Release --no-restore
+      - name: Synthetic regression tests
+        run: dotnet run --project .\PalServerManager.RegressionTests\PalServerManager.RegressionTests.csproj -c Release --no-build
+      - name: Framework-dependent win-x64 publish
+        run: |
+          dotnet publish .\PalServerManager.WinUI\PalServerManager.WinUI.csproj -c Release -r win-x64 --self-contained false -o .\artifacts\WinUI
+          dotnet publish .\PalServer-KeepAwake.Native\PalServer-KeepAwake.Native.csproj -c Release -r win-x64 --self-contained false -o .\artifacts\WinUI\Helpers

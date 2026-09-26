@@ -1,0 +1,164 @@
+<Window
+    x:Class="HaoHaoTianTian.PalHR.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="浩浩添添 Pal 人力资源部">
+
+  <Grid x:Name="RootGrid" Background="Transparent">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="52" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+
+    <Grid Grid.Row="0" Background="#D918242C" Padding="16,0,144,0" ColumnSpacing="12">
+      <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+      <Grid x:Name="TitleBarDragRegion" VerticalAlignment="Stretch">
+        <TextBlock VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
+          <Run Text="浩浩添添 Pal 人力资源部" FontSize="17" FontWeight="SemiBold" />
+          <Run Text="  ·  " FontSize="12" Foreground="{StaticResource PalMutedTextBrush}" />
+          <Run x:Name="VersionRun" FontSize="12" Foreground="{StaticResource PalCyanBrush}" />
+          <Run Text="  ·  " FontSize="11" Foreground="{StaticResource PalMutedTextBrush}" />
+          <Run Text="{x:Bind ViewModel.ServerIdentity, Mode=OneWay}" FontSize="11" Foreground="{StaticResource PalMintBrush}" />
+        </TextBlock>
+      </Grid>
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+        <TextBlock Text="{x:Bind ViewModel.UpdatedAt, Mode=OneWay}" Foreground="{StaticResource PalMutedTextBrush}" FontSize="11" VerticalAlignment="Center" />
+        <Button Command="{x:Bind ViewModel.RefreshCommand}" Width="34" Height="32" Padding="0" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" ToolTipService.ToolTip="立即刷新服务器状态" AutomationProperties.Name="立即刷新服务器状态">
+          <FontIcon Glyph="&#xE72C;" FontFamily="Segoe Fluent Icons" FontSize="14" />
+        </Button>
+      </StackPanel>
+    </Grid>
+
+    <Grid Grid.Row="1" Padding="12,10,12,12" RowSpacing="8">
+      <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="206" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+
+      <Border Grid.Row="0" Style="{StaticResource CardStyle}" Padding="14,11">
+        <Grid RowSpacing="9">
+          <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="38" /></Grid.RowDefinitions>
+          <Grid ColumnSpacing="22">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="1.2*" /><ColumnDefinition Width="1.2*" /><ColumnDefinition Width="0.8*" /><ColumnDefinition Width="0.8*" /></Grid.ColumnDefinitions>
+            <StackPanel Spacing="2"><TextBlock Text="服务器" Style="{StaticResource MetricLabelStyle}" /><TextBlock Text="{x:Bind ViewModel.ServerState, Mode=OneWay}" Style="{StaticResource MetricValueStyle}" Foreground="{StaticResource PalMintBrush}" /><TextBlock Text="{x:Bind ViewModel.PowerState, Mode=OneWay}" Foreground="{StaticResource PalMutedTextBrush}" FontSize="11" /></StackPanel>
+            <StackPanel Grid.Column="1" Spacing="2"><TextBlock Text="当前存档" Style="{StaticResource MetricLabelStyle}" /><TextBlock Text="{x:Bind ViewModel.ActiveSave, Mode=OneWay}" Style="{StaticResource MetricValueStyle}" /></StackPanel>
+            <StackPanel Grid.Column="2" Spacing="2"><TextBlock Text="在线玩家" Style="{StaticResource MetricLabelStyle}" /><TextBlock Text="{x:Bind ViewModel.PlayerCount, Mode=OneWay}" Style="{StaticResource MetricValueStyle}" /></StackPanel>
+            <StackPanel Grid.Column="3" Spacing="2"><TextBlock Text="REST API" Style="{StaticResource MetricLabelStyle}" /><TextBlock Text="{x:Bind ViewModel.RestState, Mode=OneWay}" Style="{StaticResource MetricValueStyle}" /></StackPanel>
+          </Grid>
+          <Border Grid.Row="1" Background="#9A1C2A31" BorderBrush="{StaticResource PalBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10,0">
+            <Grid ColumnSpacing="12">
+              <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+              <TextBlock Text="存档 UID" Foreground="{StaticResource PalMutedTextBrush}" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.WorldUid, Mode=OneWay}" VerticalAlignment="Center" FontFamily="Cascadia Mono, Consolas" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+              <Button Grid.Column="2" Content="复制" Click="CopyUid_Click" VerticalAlignment="Center" Padding="12,4" MinHeight="28" />
+            </Grid>
+          </Border>
+        </Grid>
+      </Border>
+
+      <Border Grid.Row="1" Style="{StaticResource CardStyle}" Padding="14,9">
+        <Grid ColumnSpacing="18">
+          <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition /><ColumnDefinition /><ColumnDefinition /><ColumnDefinition /><ColumnDefinition /></Grid.ColumnDefinitions>
+          <StackPanel><TextBlock Text="FPS" Style="{StaticResource MetricLabelStyle}" /><TextBlock Text="{x:Bind ViewModel.Fps, Mode=OneWay}" Style="{StaticResource MetricValueStyle}" /></StackPanel>
+          <StackPanel Grid.Column="1"><TextBlock Text="帧时间" Style="{StaticResource MetricLabelStyle}" /><TextBlock Text="{x:Bind ViewModel.FrameTime, Mode=OneWay}" Style="{StaticResource MetricValueStyle}" /></StackPanel>
+          <StackPanel Grid.Column="2"><TextBlock Text="CPU" Style="{StaticResource MetricLabelStyle}" /><TextBlock Text="{x:Bind ViewModel.Cpu, Mode=OneWay}" Style="{StaticResource MetricValueStyle}" /></StackPanel>
+          <StackPanel Grid.Column="3"><TextBlock Text="内存" Style="{StaticResource MetricLabelStyle}" /><TextBlock Text="{x:Bind ViewModel.Memory, Mode=OneWay}" Style="{StaticResource MetricValueStyle}" /></StackPanel>
+          <StackPanel Grid.Column="4"><TextBlock Text="运行时间" Style="{StaticResource MetricLabelStyle}" /><TextBlock Text="{x:Bind ViewModel.Uptime, Mode=OneWay}" Style="{StaticResource MetricValueStyle}" /></StackPanel>
+          <StackPanel Grid.Column="5"><TextBlock Text="磁盘可用" Style="{StaticResource MetricLabelStyle}" /><TextBlock Text="{x:Bind ViewModel.FreeDisk, Mode=OneWay}" Style="{StaticResource MetricValueStyle}" /></StackPanel>
+        </Grid>
+      </Border>
+
+      <Border Grid.Row="2" Style="{StaticResource CardStyle}" Padding="0" MinHeight="130">
+        <Grid>
+          <Grid.RowDefinitions><RowDefinition Height="42" /><RowDefinition Height="34" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+          <Grid Padding="14,0">
+            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+              <TextBlock Text="玩家" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
+              <TextBlock Text="{x:Bind ViewModel.PlayerRosterSummary, Mode=OneWay}" Foreground="{StaticResource PalMintBrush}" FontSize="11" VerticalAlignment="Center" />
+            </StackPanel>
+            <TextBlock Text="在线状态每 10 秒刷新" Foreground="{StaticResource PalMutedTextBrush}" FontSize="11" HorizontalAlignment="Right" VerticalAlignment="Center" />
+          </Grid>
+          <Grid Grid.Row="1" Background="#C62A3D46" Padding="14,0,28,0" ColumnSpacing="12">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="58" /><ColumnDefinition Width="105" /><ColumnDefinition Width="48" /><ColumnDefinition Width="68" /><ColumnDefinition Width="90" /><ColumnDefinition Width="126" /><ColumnDefinition Width="235" /><ColumnDefinition Width="110" /></Grid.ColumnDefinitions>
+            <TextBlock Text="状态" Style="{StaticResource TableHeaderTextStyle}" />
+            <TextBlock Grid.Column="1" Text="玩家" Style="{StaticResource TableHeaderTextStyle}" />
+            <TextBlock Grid.Column="2" Text="等级" HorizontalAlignment="Center" Style="{StaticResource TableHeaderTextStyle}" />
+            <TextBlock Grid.Column="3" Text="延迟" HorizontalAlignment="Center" Style="{StaticResource TableHeaderTextStyle}" />
+            <TextBlock Grid.Column="4" Text="本次在线" HorizontalAlignment="Center" Style="{StaticResource TableHeaderTextStyle}" />
+            <TextBlock Grid.Column="5" Text="上次在线" Style="{StaticResource TableHeaderTextStyle}" />
+            <TextBlock Grid.Column="6" Text="玩家 UID" Style="{StaticResource TableHeaderTextStyle}" />
+            <TextBlock Grid.Column="7" Text="平台账号" Style="{StaticResource TableHeaderTextStyle}" />
+          </Grid>
+          <ListView Grid.Row="2" ItemsSource="{x:Bind ViewModel.Players}" SelectionMode="Single" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ListView.ItemContainerStyle><Style TargetType="ListViewItem"><Setter Property="HorizontalContentAlignment" Value="Stretch" /><Setter Property="Padding" Value="0" /></Style></ListView.ItemContainerStyle>
+            <ListView.ItemTemplate>
+              <DataTemplate>
+                <Grid Height="44" Padding="14,0,28,0" ColumnSpacing="12" ToolTipService.ToolTip="{Binding PlayerId}">
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="58" /><ColumnDefinition Width="105" /><ColumnDefinition Width="48" /><ColumnDefinition Width="68" /><ColumnDefinition Width="90" /><ColumnDefinition Width="126" /><ColumnDefinition Width="235" /><ColumnDefinition Width="110" /></Grid.ColumnDefinitions>
+                  <TextBlock Text="{Binding Status}" Style="{StaticResource TableCellTextStyle}" FontSize="13" FontWeight="SemiBold" />
+                  <TextBlock Grid.Column="1" Text="{Binding Name}" Style="{StaticResource TableCellTextStyle}" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Grid.Column="2" Text="{Binding Level}" HorizontalAlignment="Center" Style="{StaticResource TableCellTextStyle}" />
+                  <TextBlock Grid.Column="3" Text="{Binding Ping}" HorizontalAlignment="Center" Style="{StaticResource TableCellTextStyle}" />
+                  <TextBlock Grid.Column="4" Text="{Binding OnlineDuration}" HorizontalAlignment="Center" Style="{StaticResource TableCellTextStyle}" />
+                  <TextBlock Grid.Column="5" Text="{Binding LastOnline}" Style="{StaticResource TableCellTextStyle}" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Grid.Column="6" Text="{Binding PlayerId}" Style="{StaticResource TableCellTextStyle}" FontFamily="Cascadia Mono, Consolas" FontSize="11" />
+                  <TextBlock Grid.Column="7" Text="{Binding Account}" Style="{StaticResource TableCellTextStyle}" TextTrimming="CharacterEllipsis" />
+                </Grid>
+              </DataTemplate>
+            </ListView.ItemTemplate>
+          </ListView>
+        </Grid>
+      </Border>
+
+      <Grid Grid.Row="3" ColumnSpacing="10">
+        <Grid.ColumnDefinitions><ColumnDefinition Width="0.92*" /><ColumnDefinition Width="1.08*" /></Grid.ColumnDefinitions>
+        <Border Style="{StaticResource CardStyle}" Padding="14,12">
+          <Grid RowSpacing="7">
+            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="*" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+            <StackPanel Orientation="Horizontal" Spacing="9"><Border Width="4" Background="{StaticResource PalCyanBrush}" CornerRadius="2" /><TextBlock Text="服务器操作" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" /></StackPanel>
+            <TextBlock Grid.Row="1" Text="保存、重启、关服或回档当前存档。" Foreground="{StaticResource PalMutedTextBrush}" FontSize="12" />
+            <Grid Grid.Row="2" ColumnSpacing="9"><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition /></Grid.ColumnDefinitions><Button Content="立即保存" Command="{x:Bind ViewModel.SaveCommand}" IsEnabled="{x:Bind ViewModel.IsServerRunning, Mode=OneWay}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" /><Button Grid.Column="1" Content="保存并重启" Command="{x:Bind ViewModel.RestartCommand}" IsEnabled="{x:Bind ViewModel.IsServerRunning, Mode=OneWay}" Style="{StaticResource PrimaryPalButtonStyle}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" /></Grid>
+            <Grid Grid.Row="3" ColumnSpacing="9"><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition /></Grid.ColumnDefinitions><Button Content="保存并关服" Command="{x:Bind ViewModel.SaveStopCommand}" IsEnabled="{x:Bind ViewModel.IsServerRunning, Mode=OneWay}" Style="{StaticResource MaintenanceButtonStyle}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" /><Button Grid.Column="1" Content="不保存强制关服" Command="{x:Bind ViewModel.ForceStopCommand}" IsEnabled="{x:Bind ViewModel.IsServerRunning, Mode=OneWay}" Style="{StaticResource DangerButtonStyle}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" /></Grid>
+            <Grid Grid.Row="4" ColumnSpacing="9">
+              <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition /></Grid.ColumnDefinitions>
+              <Button Content="从备份回档…" Command="{x:Bind ViewModel.RollbackCommand}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
+              <Button Grid.Column="1" Content="世界设置…" Command="{x:Bind ViewModel.EditWorldSettingsCommand}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
+            </Grid>
+          </Grid>
+        </Border>
+
+        <Border Grid.Column="1" Style="{StaticResource CardStyle}" Padding="14,12">
+          <Grid RowSpacing="9">
+            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="38" /><RowDefinition Height="36" /><RowDefinition Height="1" /><RowDefinition Height="36" /></Grid.RowDefinitions>
+            <Grid><StackPanel Orientation="Horizontal" Spacing="9"><Border Width="4" Background="{StaticResource PalMintBrush}" CornerRadius="2" /><TextBlock Text="自动操作" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" /></StackPanel><TextBlock Text="关闭管理器会取消预约" HorizontalAlignment="Right" VerticalAlignment="Center" Foreground="{StaticResource PalMutedTextBrush}" FontSize="11" /></Grid>
+            <Grid Grid.Row="1" ColumnSpacing="7">
+              <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="56" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+              <TextBlock Text="预约日期" VerticalAlignment="Center" Foreground="{StaticResource PalMutedTextBrush}" FontSize="11" />
+              <CalendarDatePicker Grid.Column="1" Date="{x:Bind ViewModel.ScheduleDate, Mode=TwoWay}" DateFormat="{}{year.full}-{month.integer(2)}-{day.integer(2)}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
+              <TextBlock Grid.Column="2" Text="时间 24h" VerticalAlignment="Center" Foreground="{StaticResource PalMutedTextBrush}" FontSize="11" />
+              <NumberBox Grid.Column="3" Value="{x:Bind ViewModel.ScheduleHour, Mode=TwoWay}" Minimum="0" Maximum="23" SmallChange="1" SpinButtonPlacementMode="Hidden" Padding="10,7,6,4" VerticalAlignment="Stretch" VerticalContentAlignment="Center" />
+              <TextBlock Grid.Column="4" Text=":" VerticalAlignment="Center" FontWeight="SemiBold" />
+              <NumberBox Grid.Column="5" Value="{x:Bind ViewModel.ScheduleMinute, Mode=TwoWay}" Minimum="0" Maximum="59" SmallChange="1" SpinButtonPlacementMode="Hidden" Padding="10,7,6,4" VerticalAlignment="Stretch" VerticalContentAlignment="Center" />
+            </Grid>
+            <Grid Grid.Row="2" ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><ToggleSwitch IsOn="{x:Bind ViewModel.SchedulePowerOff, Mode=TwoWay}" OnContent="预约结束后关闭电脑" OffContent="预约结束后关闭电脑" VerticalAlignment="Center" /><Button Grid.Column="1" Content="设置预约" Command="{x:Bind ViewModel.SetScheduleCommand}" IsEnabled="{x:Bind ViewModel.IsServerRunning, Mode=OneWay}" Style="{StaticResource PrimaryPalButtonStyle}" VerticalAlignment="Stretch" /><Button Grid.Column="2" Content="取消预约" Command="{x:Bind ViewModel.CancelScheduleCommand}" IsEnabled="{x:Bind ViewModel.HasSchedule, Mode=OneWay}" VerticalAlignment="Stretch" /></Grid>
+            <Rectangle Grid.Row="3" Fill="{StaticResource PalBorderBrush}" />
+            <Grid Grid.Row="4" ColumnSpacing="8">
+              <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="88" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+              <ToggleSwitch IsOn="{x:Bind ViewModel.IdleShutdownEnabled, Mode=TwoWay}" OnContent="空服自动处理" OffContent="空服自动处理" VerticalAlignment="Center" />
+              <Grid Grid.Column="1" ColumnSpacing="3">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="62" /><ColumnDefinition Width="23" /></Grid.ColumnDefinitions>
+                <NumberBox Value="{x:Bind ViewModel.IdleShutdownMinutes, Mode=TwoWay}" Minimum="1" Maximum="1440" SmallChange="1" SpinButtonPlacementMode="Hidden" ValidationMode="InvalidInputOverwritten" AcceptsExpression="False" IsWrapEnabled="False" Padding="10,7,6,4" VerticalAlignment="Stretch" VerticalContentAlignment="Center" />
+                <Grid Grid.Column="1" RowSpacing="2">
+                  <Grid.RowDefinitions><RowDefinition /><RowDefinition /></Grid.RowDefinitions>
+                  <Button MinWidth="0" MinHeight="0" Padding="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Click="IncreaseIdleMinutes_Click" ToolTipService.ToolTip="增加 1 分钟" AutomationProperties.Name="增加 1 分钟"><FontIcon Glyph="&#xE70E;" FontFamily="Segoe Fluent Icons" FontSize="8" /></Button>
+                  <Button Grid.Row="1" MinWidth="0" MinHeight="0" Padding="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Click="DecreaseIdleMinutes_Click" ToolTipService.ToolTip="减少 1 分钟" AutomationProperties.Name="减少 1 分钟"><FontIcon Glyph="&#xE70D;" FontFamily="Segoe Fluent Icons" FontSize="8" /></Button>
+                </Grid>
+              </Grid>
+              <TextBlock Grid.Column="2" Text="分钟" VerticalAlignment="Center" Foreground="{StaticResource PalMutedTextBrush}" />
+              <ToggleSwitch Grid.Column="3" IsOn="{x:Bind ViewModel.IdleShutdownPowerOff, Mode=TwoWay}" OnContent="空服关服后关闭电脑" OffContent="空服关服后关闭电脑" HorizontalAlignment="Right" VerticalAlignment="Center" />
+            </Grid>
+          </Grid>
+        </Border>
+      </Grid>
+
+      <InfoBar Grid.Row="4" IsOpen="True" IsClosable="False" Severity="Informational" Message="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" Padding="10,6" />
+    </Grid>
+  </Grid>
+</Window>
