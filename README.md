@@ -6,15 +6,11 @@ It can discover and register an existing PalServer installation, manage several 
 
 PalServerManager is a community project. It is **not affiliated with or endorsed by Pocketpair**.
 
-## Getting started
+## Install
 
-This repository currently provides source code, not a GitHub Release or downloadable binary. After building (or obtaining a separately distributed application), extract the application to a folder outside your PalServer installation and run `PalServerManager.WinUI.exe`.
+Download `PalServerManager-v2.4.0-win-x64.zip` from [GitHub Releases](https://github.com/Zhehao-w/pal-server-manager/releases), extract it to a normal application folder **separate from PalServer**, and run `PalServerManager.WinUI.exe`. This is a framework-dependent Windows x64 build, not an installer. Install the [x64 .NET 10 Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/10.0), [Windows App SDK 2.4 runtime](https://learn.microsoft.com/en-us/windows/apps/windows-app-sdk/downloads), and [x64 Visual C++ Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist) if they are not already present.
 
-1. Choose **Auto Detect** or **Select PalServer.exe** and register the installation.
-2. The Manager inspects existing worlds without changing their game saves. Choose **Attach Existing Worlds** to initialize Manager-owned state for the discovered worlds.
-3. Open the Manager and select a world to start the server. Existing registered servers reopen after state and world-identity validation.
-
-If PalServer has not yet created a world, start it once outside the Manager, wait for its first save, stop it, then choose **Recheck**. When attaching multiple existing worlds, their settings profiles initially come from the current `PalWorldSettings.ini`; review each profile if the worlds previously used different settings.
+On first launch, choose **Auto Detect** or **Select PalServer.exe**. For an existing unmanaged server, attach its current `SaveGames\0` world; the Manager adopts that active world in place without moving it. Other saves can then be imported separately. If PalServer has not yet created a world, start it once outside the Manager, wait for its first save, stop it, then recheck in the Manager.
 
 The application, PalServer installation, and Manager state remain separate. Manager registration and state live under `%LOCALAPPDATA%\PalServerManager`; game saves and configuration remain under the PalServer installation. Attaching an existing installation does not modify `SaveGames` or game configuration. Keep your own independent backups of important worlds.
 
