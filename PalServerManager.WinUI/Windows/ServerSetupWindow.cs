@@ -73,23 +73,27 @@ public sealed class ServerSetupWindow : Window
         Closed += (_, _) => _completion.TrySetResult(null);
         _servers.SelectionChanged += async (_, _) => await RunAsync(AssessSelectedAsync);
         _candidates.SelectionChanged += async (_, _) => await RunAsync(SelectCandidateAsync);
-        detect.Click += async (_, _) => await RunAsync(() =>
+        detect.Click += async (_, _) => await RunAsync(async () =>
         {
             _candidates.Items.Clear();
             foreach (var root in new ServerDiscoveryService().AutoDetect()) _candidates.Items.Add(root);
             _candidates.Visibility = _candidates.Items.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            if (_document.Servers.Count > 0)
+            {
+                if (_candidates.Items.Count == 1) _candidates.SelectedIndex = 0;
+                await AssessSelectedAsync();
+                return;
+            }
             if (_candidates.Items.Count == 1)
             {
                 _candidates.SelectedIndex = 0;
-                if (_document.Servers.Count == 0) return SelectCandidateAsync();
-                _status.Text = "已选择发现的安装。点击“使用此服务器”登记。";
-                return Task.CompletedTask;
+                await SelectCandidateAsync();
+                return;
             }
             _pendingRoot = null;
             _status.Text = _candidates.Items.Count == 0 ? "常见 Steam 位置中没有找到可用 PalServer。请选择 PalServer.exe。" : "请选择发现的 PalServer 安装。";
             _summary.Text = "";
             UpdateFirstRunActions(hasWorld: false);
-            return Task.CompletedTask;
         });
         browse.Click += async (_, _) => await RunAsync(async () =>
         {
