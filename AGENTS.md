@@ -44,3 +44,8 @@ circular icon's provenance and redistribution rights, package notices, privacy,
 and source license before distributing binaries. Build and run focused synthetic
 regressions; do not retest unchanged UI exhaustively. Use Computer Use only with
 explicit current-task authorization.
+
+Official release binaries come from GitHub Actions, and the source version must
+match the release tag. Codex may prepare version PRs and tags when requested;
+do not manually build or upload public binaries from a development workspace
+unless explicitly requested as recovery.
