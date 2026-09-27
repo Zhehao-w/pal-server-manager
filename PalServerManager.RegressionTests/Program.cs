@@ -32,6 +32,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ,("canonical adoption restores WorldOption after post-rename failure", CanonicalAdoptionWorldOptionRecoveryAsync)
     ,("import refuses unsafe state and rolls back metadata failures", WorldImportRefusalsAsync)
     ,("first-run setup attaches atomically from the registry perspective", FirstRunSetupAsync)
+    ,("registration restores the registry when state directory creation fails", RegistrationBoundaryRollbackAsync)
 };
 var selectedTests = args.Length == 0 ? tests : tests.Where(test => args.Any(filter =>
     test.Name.Contains(filter, StringComparison.OrdinalIgnoreCase))).ToArray();
@@ -101,6 +102,39 @@ static async Task FirstRunSetupAsync()
         var registered = await setup.RegisterAndAttachAsync(Path.Combine(serverRoot, "PalServer.exe"), "synthetic");
         Equal(registered.Id, (await registry.LoadAsync()).Servers.Single().Id);
         Equal(ServerStateKind.Ready, (await state.AssessAsync(registered)).Kind);
+    });
+}
+
+static async Task RegistrationBoundaryRollbackAsync()
+{
+    await InTempAsync(async root =>
+    {
+        var app = AppPaths.ForExplicitRoots(Path.Combine(root, "App"), Path.Combine(root, "State"));
+        var files = new SafeFileService();
+        var registry = new ServerRegistryService(app, files);
+        var existingRoot = Path.Combine(root, "ExistingPalServer");
+        var newRoot = Path.Combine(root, "NewPalServer");
+        FakeServer(existingRoot); FakeServer(newRoot);
+        var existing = RegisteredServer.Create("existing", existingRoot);
+        await files.WriteJsonAsync(app.ServerRegistryPath, new ServerRegistryDocument
+        {
+            SelectedServerId = existing.Id,
+            Servers = [existing]
+        });
+        await File.WriteAllTextAsync(app.ServersStateRoot, "synthetic obstruction");
+
+        await ThrowsAsync<IOException>(() => registry.RegisterFromExeAsync(
+            Path.Combine(newRoot, "PalServer.exe"), "new"));
+        var restored = await registry.LoadAsync();
+        Equal(1, restored.Servers.Count);
+        Equal(existing.Id, restored.Servers.Single().Id);
+        Equal(existing.Id, restored.SelectedServerId!);
+
+        File.Delete(app.ServersStateRoot);
+        var registered = await registry.RegisterFromExeAsync(Path.Combine(newRoot, "PalServer.exe"), "new");
+        var retried = await registry.LoadAsync();
+        Equal(2, retried.Servers.Count);
+        Equal(registered.Id, retried.SelectedServerId!);
     });
 }
 

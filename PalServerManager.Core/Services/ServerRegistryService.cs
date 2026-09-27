@@ -37,12 +37,35 @@ public sealed class ServerRegistryService(AppPaths app, SafeFileService files)
             var document = await LoadAsync(cancellationToken);
             if (document.Servers.Any(server => PathsEqual(server.ServerRoot, root)))
                 throw new InvalidOperationException("This PalServer installation is already registered. Select its existing registration.");
+            var original = Copy(document);
             var registered = RegisteredServer.Create(name, root);
             document.Servers.Add(registered);
             document.SelectedServerId = registered.Id;
-            await SaveAsync(document, cancellationToken);
-            Directory.CreateDirectory(ServerStatePaths.ForRegisteredServer(app, registered).StateRoot);
-            return registered;
+            try
+            {
+                await SaveAsync(document, cancellationToken);
+                Directory.CreateDirectory(ServerStatePaths.ForRegisteredServer(app, registered).StateRoot);
+                return registered;
+            }
+            catch (Exception registrationError)
+            {
+                try
+                {
+                    var persisted = await LoadAsync(CancellationToken.None);
+                    if (persisted.Servers.Any(server => server.Id == registered.Id))
+                        await SaveAsync(original, CancellationToken.None);
+                    var restored = await LoadAsync(CancellationToken.None);
+                    if (!LogicallyEqual(original, restored))
+                        throw new InvalidOperationException("The registry does not match its pre-registration state.");
+                }
+                catch (Exception rollbackError)
+                {
+                    throw new InvalidOperationException(
+                        "Server registration failed and registry rollback could not be verified.",
+                        new AggregateException(registrationError, rollbackError));
+                }
+                throw;
+            }
         }
         finally { _gate.Release(); }
     }
@@ -114,6 +137,18 @@ public sealed class ServerRegistryService(AppPaths app, SafeFileService files)
         Validate(document);
         return files.WriteJsonAsync(app.ServerRegistryPath, document, JsonOptions, keepPrevious: true, cancellationToken: cancellationToken);
     }
+
+    private static ServerRegistryDocument Copy(ServerRegistryDocument document) => new()
+    {
+        SchemaVersion = document.SchemaVersion,
+        SelectedServerId = document.SelectedServerId,
+        Servers = [.. document.Servers]
+    };
+
+    private static bool LogicallyEqual(ServerRegistryDocument expected, ServerRegistryDocument actual) =>
+        expected.SchemaVersion == actual.SchemaVersion &&
+        expected.SelectedServerId == actual.SelectedServerId &&
+        expected.Servers.SequenceEqual(actual.Servers);
 
     private static void Validate(ServerRegistryDocument document)
     {

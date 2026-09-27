@@ -231,8 +231,16 @@ public sealed class ServerSetupWindow : Window
     private Task AssessPendingAsync()
     {
         if (_pendingRoot is null) return Task.CompletedTask;
+        UpdateFirstRunActions(hasWorld: false);
         var pending = RegisteredServer.Create("pending", _pendingRoot);
-        var worlds = _serverState.DiscoverWorlds(pending);
+        IReadOnlyList<DiscoveredWorld> worlds;
+        try { worlds = _serverState.DiscoverWorlds(pending); }
+        catch (Exception error)
+        {
+            _status.Text = $"当前 SaveGames\\0 暂时无法接入：{error.Message}\n完成存盘或修复问题后请重新检查。";
+            _summary.Text = $"已选择服务器\n   {_pendingRoot}";
+            return Task.CompletedTask;
+        }
         _status.Text = worlds.Count == 0
             ? "PalServer 路径有效，但未找到可接入的现有世界。"
             : "PalServer 路径有效，已找到可接入的现有世界。";
