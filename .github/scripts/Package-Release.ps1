@@ -13,6 +13,16 @@ if (-not (Test-Path -LiteralPath (Join-Path $publish 'PalServerManager.WinUI.exe
     -not (Test-Path -LiteralPath (Join-Path $publish 'Helpers/PalServer-KeepAwake.exe') -PathType Leaf)) {
     throw 'Publish output is missing the Manager or KeepAwake executable.'
 }
+$repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
+$notices = [ordered]@{
+    'LICENSE' = Join-Path $repoRoot 'LICENSE'
+    'ASSETS.md' = Join-Path $repoRoot 'docs/ASSETS.md'
+}
+foreach ($source in $notices.Values) {
+    if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
+        throw "Required release notice is missing: $source"
+    }
+}
 $output = [System.IO.Path]::GetFullPath($OutputDir)
 if ($output.Equals($publish, [StringComparison]::OrdinalIgnoreCase) -or
     $output.StartsWith($publish + [System.IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
@@ -34,9 +44,15 @@ try {
             Where-Object { $_.Extension -ine '.pdb' } |
             ForEach-Object {
                 $relative = [System.IO.Path]::GetRelativePath($publish, $_.FullName).Replace('\', '/')
-                [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
-                    $archive, $_.FullName, $relative, [System.IO.Compression.CompressionLevel]::Optimal) | Out-Null
+                if ($relative -notin $notices.Keys) {
+                    [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
+                        $archive, $_.FullName, $relative, [System.IO.Compression.CompressionLevel]::Optimal) | Out-Null
+                }
             }
+        foreach ($entryName in $notices.Keys) {
+            [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
+                $archive, $notices[$entryName], $entryName, [System.IO.Compression.CompressionLevel]::Optimal) | Out-Null
+        }
     } finally {
         $archive.Dispose()
     }
@@ -49,6 +65,8 @@ try {
     $names = @($check.Entries | ForEach-Object FullName)
     if ($names -notcontains 'PalServerManager.WinUI.exe' -or
         $names -notcontains 'Helpers/PalServer-KeepAwake.exe' -or
+        $names -notcontains 'LICENSE' -or
+        $names -notcontains 'ASSETS.md' -or
         @($names | Where-Object { $_ -match '\.pdb$' }).Count -ne 0) {
         throw 'Release ZIP layout verification failed.'
     }
