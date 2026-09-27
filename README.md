@@ -20,7 +20,8 @@ PalServerManager is an unofficial WinUI 3 desktop utility for people who run a l
 
 - Manage multiple Palworld worlds from one registered server installation.
 - Attach an existing active `SaveGames\0` world in place without modifying its saves or game configuration.
-- Import external or noncanonical saves through a complete copy-and-verify process; source data remains untouched.
+- Import external saves through a complete copy-and-verify process; the original external source remains untouched.
+- Import unregistered noncanonical saves already inside the managed SaveGames into a verified canonical folder, with safe cleanup of an eligible old container only after registration succeeds.
 - Adopt copied canonical parked worlds such as `0 - Slot NNN - <tag>` in place during fresh-PC migration.
 - Maintain a separate settings profile for each world.
 - Switch worlds safely with identity checks, transaction records, protective backups, and rollback.
@@ -61,7 +62,7 @@ If PalServer has not created a world yet, start it once outside the Manager, wai
 3. Attach the current `SaveGames\0` world in place.
 4. Explicitly import any additional copied canonical folders such as `0 - Slot NNN - <tag>`; when safe, the Manager adopts them in place without requiring prior Manager state.
 
-External or noncanonical worlds continue through the safe copy-and-verify import path. Stop PalServer before importing worlds.
+External worlds use the safe copy-and-verify import path, and their original source remains untouched. An unregistered noncanonical source already inside the current managed SaveGames is also copied and verified into a canonical folder. After successful registration, its old container may be removed only if it is unchanged and contains no extra content; cleanup failure does not invalidate the successfully imported copy. Stop PalServer before importing worlds.
 
 ## Data & Safety
 
