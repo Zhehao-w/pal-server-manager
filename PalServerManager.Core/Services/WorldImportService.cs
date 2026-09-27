@@ -4,7 +4,7 @@ using HaoHaoTianTian.PalHR.Models;
 
 namespace HaoHaoTianTian.PalHR.Services;
 
-public enum WorldImportCheckpoint { BeforeProfileWrite, BeforeRegistryCommit }
+public enum WorldImportCheckpoint { AfterWorldOptionRename, BeforeProfileWrite, BeforeRegistryCommit }
 
 /// <summary>Imports an explicitly selected world by verified copy, or safely adopts an existing canonical parked slot.</summary>
 public sealed class WorldImportService(
@@ -185,7 +185,12 @@ public sealed class WorldImportService(
             await journal.WriteAsync(operation, "ValidatedInPlace", cancellationToken);
             journalCreated = true;
             foreach (var conflict in worldOptions.Detect(desired, slot.Id))
-                disabledOptions.Add((conflict.FilePath, await worldOptions.BackupAndDisableAsync(conflict, cancellationToken)));
+            {
+                var disabled = worldOptions.Disable(conflict);
+                disabledOptions.Add((conflict.FilePath, disabled));
+                checkpoint?.Invoke(WorldImportCheckpoint.AfterWorldOptionRename);
+                await worldOptions.LogDisabledAsync(conflict, disabled, cancellationToken);
+            }
             checkpoint?.Invoke(WorldImportCheckpoint.BeforeProfileWrite);
             await settings.CommitNewWorldProfileAsync(slot.Id, slot.WorldGuid, slot.Tag, values, cancellationToken);
             await settings.LoadProfileAsync(slot.Id, slot.WorldGuid, cancellationToken);
@@ -200,14 +205,31 @@ public sealed class WorldImportService(
             await slots.SaveAsync(desired, cancellationToken);
             journal.Complete();
         }
-        catch
+        catch (Exception original)
         {
-            var afterFailure = await File.ReadAllBytesAsync(context.StatePaths.RegistryPath);
-            if (!oldRegistry.SequenceEqual(afterFailure)) throw;
-            settings.DeleteProfileIfExists(slot.Id);
-            foreach (var pair in disabledOptions.AsEnumerable().Reverse())
-                if (File.Exists(pair.Disabled) && !File.Exists(pair.Original)) File.Move(pair.Disabled, pair.Original);
-            if (journalCreated) journal.Complete();
+            var recoveryErrors = new List<Exception>();
+            try
+            {
+                var afterFailure = await File.ReadAllBytesAsync(context.StatePaths.RegistryPath);
+                if (!oldRegistry.SequenceEqual(afterFailure))
+                    throw new InvalidOperationException("登记内容已变化，保留事务证据供检查。");
+                settings.DeleteProfileIfExists(slot.Id);
+                foreach (var pair in disabledOptions.AsEnumerable().Reverse())
+                {
+                    if (!File.Exists(pair.Disabled) || File.Exists(pair.Original))
+                        throw new InvalidOperationException("WorldOption 回滚状态不明确，保留事务证据供检查。");
+                    File.Move(pair.Disabled, pair.Original);
+                }
+                if (File.Exists(profilePath) || File.Exists(profilePath + ".previous"))
+                    throw new InvalidOperationException("未提交的世界设置档未能清理，保留事务证据供检查。");
+                if (!SameHashes(sourceHashes, HashFiles(worldSource)))
+                    throw new InvalidOperationException("原位来源未恢复到接入前状态，保留事务证据供检查。");
+                if (journalCreated) journal.Complete();
+            }
+            catch (Exception recoveryError) { recoveryErrors.Add(recoveryError); }
+            if (recoveryErrors.Count > 0)
+                throw new AggregateException("原位接入失败且无法验证自动回滚；保留事务证据供检查。",
+                    new[] { original }.Concat(recoveryErrors));
             throw;
         }
         string? warning = null;

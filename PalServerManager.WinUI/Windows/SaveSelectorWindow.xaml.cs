@@ -80,7 +80,12 @@ public sealed partial class SaveSelectorWindow : Window
         if (_initialized) return;
         _initialized = true;
         await ViewModel.InitializeAsync();
-        await RefreshMigrationNoticeAsync();
+        try { await RefreshMigrationNoticeAsync(); }
+        catch (Exception error)
+        {
+            MigrationNotice.Visibility = Visibility.Collapsed;
+            ViewModel.Feedback = "未能检查其他现有存档：" + error.Message;
+        }
     }
 
     private async Task RefreshMigrationNoticeAsync()
@@ -98,7 +103,9 @@ public sealed partial class SaveSelectorWindow : Window
         ViewModel.IsBusy = true;
         try
         {
-            await ImportSelectedAsync(await _slots.LoadAsync(), _migrationCandidates);
+            var candidate = await ShowDiscoveryAsync(new WorldDiscoveryReport(_migrationCandidates, []));
+            if (candidate is null) return;
+            await ImportSelectedAsync(await _slots.LoadAsync(), [candidate]);
             await RefreshMigrationNoticeAsync();
         }
         catch (Exception error) { ViewModel.Feedback = "导入存档失败：" + error.Message; }

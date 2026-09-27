@@ -22,10 +22,20 @@ public sealed class WorldOptionService(SaveSlotService slots, LoggingService log
 
     public async Task<string> BackupAndDisableAsync(WorldOptionConflict conflict, CancellationToken cancellationToken = default)
     {
+        var disabled = Disable(conflict);
+        await LogDisabledAsync(conflict, disabled, cancellationToken);
+        return disabled;
+    }
+
+    public string Disable(WorldOptionConflict conflict)
+    {
         if (!File.Exists(conflict.FilePath)) throw new FileNotFoundException("WorldOption 文件已经不存在。", conflict.FilePath);
         var disabled = conflict.FilePath + $".disabled-{DateTime.Now:yyyyMMdd-HHmmss}";
         File.Move(conflict.FilePath, disabled);
-        await log.WriteAsync($"World-local options file was backed up and disabled: {conflict.FilePath} -> {disabled}", cancellationToken);
         return disabled;
     }
+
+    public Task LogDisabledAsync(WorldOptionConflict conflict, string disabledPath,
+        CancellationToken cancellationToken = default) =>
+        log.WriteAsync($"World-local options file was backed up and disabled: {conflict.FilePath} -> {disabledPath}", cancellationToken);
 }
