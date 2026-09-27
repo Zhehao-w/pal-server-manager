@@ -71,7 +71,7 @@ public sealed class ServerSetupWindow : Window
         Content = new ScrollViewer { Content = _panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
 
         Closed += (_, _) => _completion.TrySetResult(null);
-        _servers.SelectionChanged += async (_, _) => await RunAsync(AssessSelectedAsync);
+        _servers.SelectionChanged += async (_, _) => await RunAsync(PersistSelectionAndAssessAsync);
         _candidates.SelectionChanged += async (_, _) => await RunAsync(SelectCandidateAsync);
         detect.Click += async (_, _) => await RunAsync(async () =>
         {
@@ -180,6 +180,13 @@ public sealed class ServerSetupWindow : Window
     private RegisteredServer? SelectedServer() => _servers.SelectedIndex >= 0 && _servers.SelectedIndex < _document.Servers.Count
         ? _document.Servers[_servers.SelectedIndex] : null;
 
+    private async Task PersistSelectionAndAssessAsync()
+    {
+        var server = SelectedServer();
+        if (server is not null) await _registry.SelectAsync(server.Id);
+        await AssessSelectedAsync();
+    }
+
     private async Task AssessSelectedAsync()
     {
         var server = SelectedServer();
@@ -193,7 +200,6 @@ public sealed class ServerSetupWindow : Window
             _refresh.Visibility = Visibility.Collapsed;
             return;
         }
-        await _registry.SelectAsync(server.Id);
         var result = await _serverState.AssessAsync(server);
         _status.Text = result.Message;
         _summary.Text = "管理器状态与游戏存档分开保存；接入不会改动 SaveGames。";
