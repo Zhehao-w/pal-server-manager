@@ -43,12 +43,13 @@ public partial class App : Application
             StartupDiagnosticsService.Write(appPaths);
             var serverRegistry = new ServerRegistryService(appPaths, safeFiles);
             var serverState = new ServerStateService(appPaths, safeFiles);
+            var firstRunSetup = new FirstRunServerSetupService(serverRegistry, serverState);
             var document = await serverRegistry.LoadAsync();
             var registered = document.Servers.FirstOrDefault(server => server.Id == document.SelectedServerId);
             var assessment = registered is null ? null : await serverState.AssessAsync(registered);
             if (assessment?.Kind != ServerStateKind.Ready || document.Servers.Count != 1)
             {
-                setup = new ServerSetupWindow(serverRegistry, serverState);
+                setup = new ServerSetupWindow(serverRegistry, serverState, firstRunSetup);
                 registered = await setup.ShowAsync();
                 if (registered is null) return;
                 var finalAssessment = await serverState.AssessAsync(registered);

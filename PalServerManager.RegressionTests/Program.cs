@@ -31,6 +31,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ,("canonical parked world is adopted in place after read-only discovery", CanonicalWorldAdoptionAsync)
     ,("canonical adoption restores WorldOption after post-rename failure", CanonicalAdoptionWorldOptionRecoveryAsync)
     ,("import refuses unsafe state and rolls back metadata failures", WorldImportRefusalsAsync)
+    ,("first-run setup attaches atomically from the registry perspective", FirstRunSetupAsync)
 };
 var selectedTests = args.Length == 0 ? tests : tests.Where(test => args.Any(filter =>
     test.Name.Contains(filter, StringComparison.OrdinalIgnoreCase))).ToArray();
@@ -75,6 +76,31 @@ static async Task DuplicateUidAsync()
         var registry = Registry(uid, uid);
         await env.Files.WriteJsonAsync(env.Context.StatePaths.RegistryPath, registry);
         await ThrowsAsync<InvalidOperationException>(() => env.Slots.LoadAsync());
+    });
+}
+
+static async Task FirstRunSetupAsync()
+{
+    await InTempAsync(async root =>
+    {
+        var app = AppPaths.ForExplicitRoots(Path.Combine(root, "App"), Path.Combine(root, "State"));
+        var files = new SafeFileService();
+        var registry = new ServerRegistryService(app, files);
+        var state = new ServerStateService(app, files);
+        var setup = new FirstRunServerSetupService(registry, state);
+        var serverRoot = Path.Combine(root, "PalServer");
+        FakeServer(serverRoot);
+
+        await ThrowsAsync<InvalidOperationException>(() => setup.RegisterAndAttachAsync(
+            Path.Combine(serverRoot, "PalServer.exe"), "synthetic"));
+        Equal(0, (await registry.LoadAsync()).Servers.Count);
+
+        var uid = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+        CreateWorld(Path.Combine(serverRoot, "Pal", "Saved", "SaveGames", "0", uid), "existing");
+        await WriteSyntheticIniAsync(serverRoot);
+        var registered = await setup.RegisterAndAttachAsync(Path.Combine(serverRoot, "PalServer.exe"), "synthetic");
+        Equal(registered.Id, (await registry.LoadAsync()).Servers.Single().Id);
+        Equal(ServerStateKind.Ready, (await state.AssessAsync(registered)).Kind);
     });
 }
 
