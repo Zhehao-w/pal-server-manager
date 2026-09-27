@@ -1,0 +1,67 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Verify tag matches source versions
+        shell: pwsh
+        run: ./.github/scripts/Verify-ReleaseVersion.ps1 -Tag $env:GITHUB_REF_NAME
+
+      - name: Restore
+        run: dotnet restore .\pal-server-manager.slnx
+      - name: Release x64 build
+        run: dotnet build .\pal-server-manager.slnx -c Release --no-restore
+      - name: Synthetic regression tests
+        run: dotnet run --project .\PalServerManager.RegressionTests\PalServerManager.RegressionTests.csproj -c Release --no-build
+      - name: Publish WinUI (framework-dependent win-x64)
+        run: dotnet publish .\PalServerManager.WinUI\PalServerManager.WinUI.csproj -c Release -r win-x64 --self-contained false --no-restore -o .\artifacts\release\publish
+      - name: Publish KeepAwake helper
+        run: dotnet publish .\PalServer-KeepAwake.Native\PalServer-KeepAwake.Native.csproj -c Release -r win-x64 --self-contained false --no-restore -o .\artifacts\release\publish\Helpers
+
+      - name: Package ZIP and SHA-256
+        shell: pwsh
+        run: ./.github/scripts/Package-Release.ps1 -Tag $env:GITHUB_REF_NAME -PublishDir ./artifacts/release/publish -OutputDir ./artifacts/release/output
+
+      - name: Retain release assets as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PalServerManager-${{ github.ref_name }}-win-x64
+          path: |
+            artifacts/release/output/*.zip
+            artifacts/release/output/SHA256SUMS.txt
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          $response = gh api "repos/$env:GITHUB_REPOSITORY/releases/tags/$tag" 2>&1 | Out-String
+          if ($LASTEXITCODE -eq 0) { throw "Release $tag already exists; refusing to overwrite it." }
+          if ($response -notmatch '\(HTTP 404\)') { throw "Could not verify release absence: $response" }
+          $zip = "artifacts/release/output/PalServerManager-$tag-win-x64.zip"
+          $sums = 'artifacts/release/output/SHA256SUMS.txt'
+          $args = @('release', 'create', $tag, $zip, $sums, '--repo', $env:GITHUB_REPOSITORY,
+                    '--title', "PalServerManager $tag", '--generate-notes', '--verify-tag')
+          if ($tag -match '-') { $args += '--prerelease' }
+          & gh @args
+          if ($LASTEXITCODE -ne 0) { throw "Release creation failed for $tag" }

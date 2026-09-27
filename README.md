@@ -42,6 +42,10 @@ dotnet publish .\PalServer-KeepAwake.Native\PalServer-KeepAwake.Native.csproj -c
 
 The regression tests use disposable synthetic server and state roots. Do not point tests at a real PalServer or a user's LocalAppData. `artifacts/` is generated output and is excluded from Git.
 
+## Maintainer release process
+
+For releases after v2.4.0, merge a small version-prep PR into `main` and wait for main CI to pass. Then create and push a `vX.Y.Z` tag matching the product and WinUI project versions. GitHub Actions builds and tests that tagged commit on a clean Windows runner, packages the framework-dependent win-x64 ZIP, generates its SHA-256 checksum, and publishes the official GitHub Release. Developer workspaces are not the source of those binaries.
+
 ## Privacy, assets, and license
 
 Never publish real saves, configuration, passwords, player identities, logs, or Manager runtime state. See [SECURITY.md](SECURITY.md) before sharing diagnostics. The included circular icon is derived from user-supplied artwork; its provenance and third-party IP considerations are described in [docs/ASSETS.md](docs/ASSETS.md). The project source code is licensed under [MIT](LICENSE); this does not grant rights to third-party Palworld characters or trademarks.
