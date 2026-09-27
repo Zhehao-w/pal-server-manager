@@ -28,6 +28,8 @@ var tests = new (string Name, Func<Task> Run)[]
     ,("world discovery reports managed, unmanaged, duplicate and incomplete states", WorldDiscoveryAsync)
     ,("rescan is read-only and profiles reconcile without repair", ReadOnlyRescanAsync)
     ,("canonical copy import uses monotonic IDs and selected settings", ExistingWorldImportAsync)
+    ,("canonical parked world is adopted in place after read-only discovery", CanonicalWorldAdoptionAsync)
+    ,("canonical adoption restores WorldOption after post-rename failure", CanonicalAdoptionWorldOptionRecoveryAsync)
     ,("import refuses unsafe state and rolls back metadata failures", WorldImportRefusalsAsync)
 };
 var selectedTests = args.Length == 0 ? tests : tests.Where(test => args.Any(filter =>
@@ -907,6 +909,91 @@ static async Task ExistingWorldImportAsync()
         True(retained.CleanupWarning is not null && Directory.Exists(retainedSource), "extra source content was silently deleted");
         True(File.Exists(Path.Combine(env.Context.ServerPaths.SaveRoot, retained.Slot.ParkedFolder, retainedUid, "Level.sav")),
             "successful canonical copy was rolled back because old source was retained");
+    });
+}
+
+static async Task CanonicalWorldAdoptionAsync()
+{
+    await InTempAsync(async root =>
+    {
+        var env = CreateEnvironment(root);
+        const string activeUid = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+        const string parkedUid = "55555555555555555555555555555555";
+        var registry = new SaveSlotRegistry { ActiveSlotId = 0, NextSlotId = 1, Slots =
+        [new SaveSlot { Id = 0, Tag = "current", WorldGuid = activeUid, ParkedFolder = "0 - Slot 000 - current" }] };
+        CreateWorld(Path.Combine(env.Context.ServerPaths.ActivePath, activeUid), "active");
+        var canonicalFolder = Path.Combine(env.Context.ServerPaths.SaveRoot, "0 - Slot 005 - Raid World");
+        var world = Path.Combine(canonicalFolder, parkedUid);
+        CreateWorld(world, "copied-parked-world");
+        await File.WriteAllTextAsync(Path.Combine(world, "WorldOption.sav"), "original-option-bytes");
+        Directory.CreateDirectory(Path.GetDirectoryName(env.Context.ServerPaths.UserSettingsPath)!);
+        await File.WriteAllTextAsync(env.Context.ServerPaths.UserSettingsPath, $"DedicatedServerName={activeUid}");
+        await env.Slots.SaveAsync(registry);
+        await WriteProfileAsync(env, registry.Slots[0], activeUid);
+        var discovery = new WorldDiscoveryService(env.Context.ServerPaths, env.Context.StatePaths);
+        var beforeScanSaves = SnapshotFiles(env.Context.ServerPaths.SaveRoot);
+        var beforeScanState = SnapshotFiles(env.Context.StatePaths.StateRoot);
+        var report = await discovery.ScanAsync(registry);
+        var candidate = report.Worlds.Single(item => item.WorldUid == parkedUid);
+        True(candidate.CanImport, "canonical copied world was not reported as importable");
+        EqualFileSnapshots(beforeScanSaves, SnapshotFiles(env.Context.ServerPaths.SaveRoot));
+        EqualFileSnapshots(beforeScanState, SnapshotFiles(env.Context.StatePaths.StateRoot));
+
+        var result = await NewImporter(env, discovery).ImportAsync(candidate.FolderPath, parkedUid, "ignored UI tag",
+            new(ExistingWorldSettingsMode.ActiveProfile));
+        Equal(5, result.Slot.Id);
+        Equal("Raid World", result.Slot.Tag);
+        Equal("0 - Slot 005 - Raid World", result.Slot.ParkedFolder);
+        True(Directory.Exists(world), "adoption moved or replaced the UID path");
+        Equal(2, Directory.EnumerateDirectories(env.Context.ServerPaths.SaveRoot).Count());
+        True(!File.Exists(Path.Combine(world, "WorldOption.sav")), "adopted WorldOption remained active");
+        Equal("original-option-bytes", await File.ReadAllTextAsync(Directory.EnumerateFiles(world, "WorldOption.sav.disabled-*").Single()));
+        var after = await env.Slots.LoadAsync();
+        Equal(6, after.NextSlotId);
+        True(after.Slots.Any(slot => slot.Id == 5 && slot.WorldGuid == parkedUid), "adopted slot was not registered");
+        var profile = await env.WorldSettings.LoadProfileAsync(5, parkedUid);
+        Equal("Raid World", profile.Tag);
+    });
+}
+
+static async Task CanonicalAdoptionWorldOptionRecoveryAsync()
+{
+    await InTempAsync(async root =>
+    {
+        var env = CreateEnvironment(root);
+        const string activeUid = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+        const string parkedUid = "55555555555555555555555555555555";
+        var registry = new SaveSlotRegistry { ActiveSlotId = 0, NextSlotId = 1, Slots =
+        [new SaveSlot { Id = 0, Tag = "current", WorldGuid = activeUid, ParkedFolder = "0 - Slot 000 - current" }] };
+        CreateWorld(Path.Combine(env.Context.ServerPaths.ActivePath, activeUid), "active");
+        var canonicalFolder = Path.Combine(env.Context.ServerPaths.SaveRoot, "0 - Slot 005 - Raid World");
+        var world = Path.Combine(canonicalFolder, parkedUid);
+        CreateWorld(world, "copied-parked-world");
+        var worldOption = Path.Combine(world, "WorldOption.sav");
+        await File.WriteAllBytesAsync(worldOption, [1, 3, 5, 7, 9]);
+        Directory.CreateDirectory(Path.GetDirectoryName(env.Context.ServerPaths.UserSettingsPath)!);
+        await File.WriteAllTextAsync(env.Context.ServerPaths.UserSettingsPath, $"DedicatedServerName={activeUid}");
+        await env.Slots.SaveAsync(registry);
+        await WriteProfileAsync(env, registry.Slots[0], activeUid);
+        var registryBefore = await File.ReadAllBytesAsync(env.Context.StatePaths.RegistryPath);
+        var worldBefore = SnapshotFiles(world);
+        var discovery = new WorldDiscoveryService(env.Context.ServerPaths, env.Context.StatePaths);
+        var importer = NewImporter(env, discovery, checkpoint: point =>
+        {
+            if (point == WorldImportCheckpoint.AfterWorldOptionRename) throw new IOException("synthetic post-rename failure");
+        });
+
+        await ThrowsAsync<IOException>(() => importer.ImportAsync(canonicalFolder, parkedUid, "ignored",
+            new(ExistingWorldSettingsMode.ActiveProfile)));
+        var registryAfter = await File.ReadAllBytesAsync(env.Context.StatePaths.RegistryPath);
+        True(registryBefore.SequenceEqual(registryAfter),
+            "failed adoption committed registry changes");
+        EqualFileSnapshots(worldBefore, SnapshotFiles(world));
+        var restoredOption = await File.ReadAllBytesAsync(worldOption);
+        True(File.Exists(worldOption) && restoredOption.SequenceEqual(new byte[] { 1, 3, 5, 7, 9 }),
+            "WorldOption filename or bytes were not restored");
+        True(!File.Exists(env.WorldSettings.GetProfilePath(5)), "failed adoption retained an uncommitted profile");
+        True(!File.Exists(env.Context.StatePaths.PendingOperationPath), "verified recovery retained the operation journal");
     });
 }
 
