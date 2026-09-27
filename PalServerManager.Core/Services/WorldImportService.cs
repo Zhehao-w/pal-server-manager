@@ -1,11 +1,12 @@
 using System.Security.Cryptography;
+using System.Text.RegularExpressions;
 using HaoHaoTianTian.PalHR.Models;
 
 namespace HaoHaoTianTian.PalHR.Services;
 
 public enum WorldImportCheckpoint { BeforeProfileWrite, BeforeRegistryCommit }
 
-/// <summary>Copies an explicitly selected world to a verified canonical parked slot.</summary>
+/// <summary>Imports an explicitly selected world by verified copy, or safely adopts an existing canonical parked slot.</summary>
 public sealed class WorldImportService(
     PalContext context, ServerProcessService processes, SaveSlotService slots,
     WorldSettingsService settings, WorldIdentityAuditService identity,
@@ -28,6 +29,10 @@ public sealed class WorldImportService(
             var registry = await slots.LoadAsync(cancellationToken);
             await identity.AuditOrThrowAsync(registry, cancellationToken: cancellationToken);
             var candidate = await RequireCandidateAsync(registry, selectedPath, expectedUid, cancellationToken);
+            var canonical = TryGetCanonicalAdoption(candidate, registry);
+            if (canonical is not null)
+                return await AdoptCanonicalAsync(registry, candidate, canonical.Value.Id, canonical.Value.Tag,
+                    sourceSettings, cancellationToken);
             if (registry.NextSlotId < 0 || registry.NextSlotId <= registry.Slots.Max(slot => slot.Id) ||
                 registry.NextSlotId == int.MaxValue)
                 throw new InvalidOperationException("NextSlotId 无效，不能安全分配新编号。");
@@ -135,6 +140,98 @@ public sealed class WorldImportService(
         }
         finally { _gate.Release(); }
     }
+
+    private (int Id, string Tag)? TryGetCanonicalAdoption(WorldObservation candidate, SaveSlotRegistry registry)
+    {
+        var saveRoot = Path.GetFullPath(context.ServerPaths.SaveRoot).TrimEnd(Path.DirectorySeparatorChar);
+        var source = Path.GetFullPath(candidate.FolderPath).TrimEnd(Path.DirectorySeparatorChar);
+        if (!string.Equals(Path.GetDirectoryName(source), saveRoot, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(Path.GetFileName(source), "0", StringComparison.OrdinalIgnoreCase)) return null;
+        var match = CanonicalFolderRegex.Match(Path.GetFileName(source));
+        if (!match.Success || !int.TryParse(match.Groups[1].Value, out var id) || id < 0 || id == int.MaxValue)
+            return null;
+        var tag = SaveSlotService.ValidateTag(match.Groups[2].Value);
+        if (!string.Equals(SaveSlotService.NewParkedFolderName(id, tag), Path.GetFileName(source), StringComparison.Ordinal))
+            return null;
+        // An occupied number remains registry authority; use the ordinary copy import with NextSlotId.
+        return registry.Slots.Any(slot => slot.Id == id) ? null : (id, tag);
+    }
+
+    private async Task<WorldImportResult> AdoptCanonicalAsync(SaveSlotRegistry registry, WorldObservation candidate,
+        int slotId, string tag, ExistingWorldSettingsChoice sourceSettings, CancellationToken cancellationToken)
+    {
+        var folderName = Path.GetFileName(candidate.FolderPath.TrimEnd(Path.DirectorySeparatorChar));
+        var worldSource = candidate.WorldPath!;
+        BackupService.RejectReparsePoints(candidate.FolderPath);
+        BackupService.RejectReparsePoints(worldSource);
+        var sourceHashes = HashFiles(worldSource);
+        var values = await settings.ResolveExistingWorldSourceAsync(sourceSettings, registry, cancellationToken);
+        var slot = new SaveSlot { Id = slotId, Tag = tag, WorldGuid = candidate.WorldUid!, ParkedFolder = folderName,
+            CreatedAtUtc = DateTimeOffset.UtcNow.ToString("O") };
+        var profilePath = settings.GetProfilePath(slot.Id);
+        if (File.Exists(profilePath) || File.Exists(profilePath + ".previous"))
+            throw new InvalidOperationException("规范目录中的编号已有设置档或历史文件；不能原位接入。");
+        var desired = new SaveSlotRegistry { Version = registry.Version, ActiveSlotId = registry.ActiveSlotId,
+            NextSlotId = Math.Max(registry.NextSlotId, checked(slot.Id + 1)), Slots = registry.Slots.Concat([slot]).ToList() };
+        var oldRegistry = await File.ReadAllBytesAsync(context.StatePaths.RegistryPath, cancellationToken);
+        var operation = new PendingOperation { Type = "AdoptCanonicalWorld", FromSlot = registry.ActiveSlotId,
+            FromWorldUid = registry.Slots.Single(item => item.Id == registry.ActiveSlotId).WorldGuid,
+            ToSlot = slot.Id, ToWorldUid = slot.WorldGuid, SourcePath = worldSource, QuarantinePath = candidate.FolderPath };
+        var disabledOptions = new List<(string Original, string Disabled)>();
+        var journalCreated = false;
+        try
+        {
+            await RequireCandidateAsync(registry, candidate.FolderPath, slot.WorldGuid, cancellationToken);
+            await journal.WriteAsync(operation, "ValidatedInPlace", cancellationToken);
+            journalCreated = true;
+            foreach (var conflict in worldOptions.Detect(desired, slot.Id))
+                disabledOptions.Add((conflict.FilePath, await worldOptions.BackupAndDisableAsync(conflict, cancellationToken)));
+            checkpoint?.Invoke(WorldImportCheckpoint.BeforeProfileWrite);
+            await settings.CommitNewWorldProfileAsync(slot.Id, slot.WorldGuid, slot.Tag, values, cancellationToken);
+            await settings.LoadProfileAsync(slot.Id, slot.WorldGuid, cancellationToken);
+            await journal.WriteAsync(operation, "ProfilePrepared", cancellationToken);
+            var beforeCommit = await File.ReadAllBytesAsync(context.StatePaths.RegistryPath, cancellationToken);
+            if (IsRunning() || !oldRegistry.SequenceEqual(beforeCommit) ||
+                !SameHashesExceptDisabledOptions(sourceHashes, HashFiles(worldSource), worldSource, disabledOptions))
+                throw new InvalidOperationException("原位接入期间服务器、来源或登记内容发生变化；已取消。");
+            await RequireCandidateAsync(registry, candidate.FolderPath, slot.WorldGuid, cancellationToken);
+            await identity.AuditOrThrowAsync(registry, checkInterruptedOperation: false, cancellationToken: cancellationToken);
+            checkpoint?.Invoke(WorldImportCheckpoint.BeforeRegistryCommit);
+            await slots.SaveAsync(desired, cancellationToken);
+            journal.Complete();
+        }
+        catch
+        {
+            var afterFailure = await File.ReadAllBytesAsync(context.StatePaths.RegistryPath);
+            if (!oldRegistry.SequenceEqual(afterFailure)) throw;
+            settings.DeleteProfileIfExists(slot.Id);
+            foreach (var pair in disabledOptions.AsEnumerable().Reverse())
+                if (File.Exists(pair.Disabled) && !File.Exists(pair.Original)) File.Move(pair.Disabled, pair.Original);
+            if (journalCreated) journal.Complete();
+            throw;
+        }
+        string? warning = null;
+        try { await log.WriteAsync($"Adopted canonical save {slot.Id} ({slot.Tag}) in place, UID {slot.WorldGuid}, folder {slot.ParkedFolder}.", CancellationToken.None); }
+        catch (Exception error) { warning = $"原位接入已完成，但日志写入失败：{error.Message}"; }
+        return new(slot, warning);
+    }
+
+    private static bool SameHashesExceptDisabledOptions(IReadOnlyDictionary<string, string> expected,
+        IReadOnlyDictionary<string, string> actual, string worldRoot,
+        IEnumerable<(string Original, string Disabled)> disabled)
+    {
+        var adjusted = new Dictionary<string, string>(actual, StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in disabled)
+        {
+            var disabledKey = Path.GetRelativePath(worldRoot, pair.Disabled);
+            if (disabledKey is not null && adjusted.Remove(disabledKey, out var hash))
+                adjusted[Path.GetRelativePath(worldRoot, pair.Original)] = hash;
+        }
+        return expected.Count == adjusted.Count && expected.All(item => adjusted.TryGetValue(item.Key, out var hash) &&
+            string.Equals(item.Value, hash, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static readonly Regex CanonicalFolderRegex = new("^0 - Slot ([0-9]{3,}) - (.+)$", RegexOptions.CultureInvariant);
 
     private async Task<WorldImportResult> FinishCommittedAsync(SaveSlot slot, WorldObservation candidate,
         Dictionary<string, string> sourceHashes)

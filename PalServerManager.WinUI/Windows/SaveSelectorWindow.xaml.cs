@@ -22,6 +22,7 @@ public sealed partial class SaveSelectorWindow : Window
     private readonly SaveSlotService _slots;
     private readonly WorldDiscoveryService _discovery;
     private readonly WorldImportService _importer;
+    private IReadOnlyList<WorldObservation> _migrationCandidates = [];
 
     public SaveSelectorViewModel ViewModel { get; }
 
@@ -79,7 +80,33 @@ public sealed partial class SaveSelectorWindow : Window
         if (_initialized) return;
         _initialized = true;
         await ViewModel.InitializeAsync();
+        await RefreshMigrationNoticeAsync();
     }
+
+    private async Task RefreshMigrationNoticeAsync()
+    {
+        var registry = await _slots.LoadAsync();
+        var report = await _discovery.ScanAsync(registry);
+        _migrationCandidates = report.Worlds.Where(world => world.CanImport).ToArray();
+        MigrationNoticeText.Text = $"发现 {_migrationCandidates.Count} 个现有存档尚未加入管理器";
+        MigrationNotice.Visibility = _migrationCandidates.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private async void ImportDiscovered_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel.IsBusy || _migrationCandidates.Count == 0) return;
+        ViewModel.IsBusy = true;
+        try
+        {
+            await ImportSelectedAsync(await _slots.LoadAsync(), _migrationCandidates);
+            await RefreshMigrationNoticeAsync();
+        }
+        catch (Exception error) { ViewModel.Feedback = "导入存档失败：" + error.Message; }
+        finally { ViewModel.IsBusy = false; }
+    }
+
+    private void DismissMigrationNotice_Click(object sender, RoutedEventArgs e) =>
+        MigrationNotice.Visibility = Visibility.Collapsed;
 
     private void Complete(StartupChoice? choice)
     {

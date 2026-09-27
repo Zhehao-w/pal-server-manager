@@ -23,6 +23,7 @@
     <Grid Grid.Row="1" Padding="22,16,22,20" RowSpacing="12">
       <Grid.RowDefinitions>
         <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
         <RowDefinition Height="*" />
         <RowDefinition Height="Auto" />
         <RowDefinition Height="Auto" />
@@ -34,7 +35,16 @@
         <TextBlock Text="选择已有存档，或创建一个带管理标签的新世界。标签不会修改 ServerName、世界名称或存档 UID。" Foreground="{StaticResource PalMutedTextBrush}" FontSize="12" />
       </StackPanel>
 
-      <Border Grid.Row="1" Style="{StaticResource CardStyle}" Padding="0">
+      <Border x:Name="MigrationNotice" Grid.Row="1" Style="{StaticResource CardStyle}" Padding="14,10" Visibility="Collapsed">
+        <Grid ColumnSpacing="10">
+          <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+          <TextBlock x:Name="MigrationNoticeText" VerticalAlignment="Center" FontWeight="SemiBold" />
+          <Button Grid.Column="1" Content="导入现有存档…" Click="ImportDiscovered_Click" Style="{StaticResource PrimaryPalButtonStyle}" />
+          <Button Grid.Column="2" Content="稍后" Click="DismissMigrationNotice_Click" />
+        </Grid>
+      </Border>
+
+      <Border Grid.Row="2" Style="{StaticResource CardStyle}" Padding="0">
         <Grid>
           <Grid.RowDefinitions><RowDefinition Height="43" /><RowDefinition Height="35" /><RowDefinition Height="*" /></Grid.RowDefinitions>
           <Grid Padding="14,0"><TextBlock Text="存档列表" FontWeight="SemiBold" VerticalAlignment="Center" /><StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" VerticalAlignment="Center"><TextBlock Text="双击也可直接启动" VerticalAlignment="Center" Foreground="{StaticResource PalMutedTextBrush}" FontSize="11" /><Button Content="重新扫描" Click="Rescan_Click" /><Button Content="导入存档…" Click="ImportSave_Click" /></StackPanel></Grid>
@@ -56,7 +66,7 @@
         </Grid>
       </Border>
 
-      <Border Grid.Row="2" Style="{StaticResource CardStyle}" Padding="14,10">
+      <Border Grid.Row="3" Style="{StaticResource CardStyle}" Padding="14,10">
         <Grid ColumnSpacing="10">
           <Grid.ColumnDefinitions><ColumnDefinition Width="155" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
           <StackPanel VerticalAlignment="Center"><TextBlock Text="修改所选标签" FontWeight="SemiBold" /><TextBlock Text="{x:Bind ViewModel.SelectedSaveText, Mode=OneWay}" Foreground="{StaticResource PalCyanBrush}" FontSize="11" /></StackPanel>
@@ -67,7 +77,7 @@
         </Grid>
       </Border>
 
-      <Border Grid.Row="3" Style="{StaticResource CardStyle}" Padding="14,10">
+      <Border Grid.Row="4" Style="{StaticResource CardStyle}" Padding="14,10">
         <Grid ColumnSpacing="10" RowSpacing="8">
           <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
           <Grid.ColumnDefinitions><ColumnDefinition Width="155" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
@@ -81,7 +91,7 @@
         </Grid>
       </Border>
 
-      <Grid Grid.Row="4" ColumnSpacing="10">
+      <Grid Grid.Row="5" ColumnSpacing="10">
         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
         <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
           <Button Content="从备份回档并启动…" Command="{x:Bind ViewModel.RollbackCommand}" />

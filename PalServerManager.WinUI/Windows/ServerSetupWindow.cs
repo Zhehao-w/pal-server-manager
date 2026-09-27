@@ -18,11 +18,10 @@ public sealed class ServerSetupWindow : Window
     private readonly TaskCompletionSource<RegisteredServer?> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly ComboBox _servers = new() { MinWidth = 430, PlaceholderText = "选择已登记的服务器" };
     private readonly ComboBox _candidates = new() { MinWidth = 430, PlaceholderText = "选择自动发现的 PalServer" };
-    private readonly TextBox _name = new() { Header = "显示名称", PlaceholderText = "例如：本机 PalServer" };
     private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap, MaxWidth = 640 };
     private readonly TextBlock _summary = new() { TextWrapping = TextWrapping.Wrap, MaxWidth = 640 };
-    private readonly Button _continue = new() { Content = "进入管理器" };
-    private readonly Button _attach = new() { Content = "接入现有世界" };
+    private readonly Button _continue = new() { Content = "进入管理器", Style = (Style)Application.Current.Resources["AccentButtonStyle"] };
+    private readonly Button _attach = new() { Content = "接入并继续", Style = (Style)Application.Current.Resources["AccentButtonStyle"] };
     private readonly Button _refresh = new() { Content = "重新检查" };
     private readonly Button _relocate = new() { Content = "重新定位" };
     private readonly Button _remove = new() { Content = "移除注册（保留状态）" };
@@ -51,33 +50,29 @@ public sealed class ServerSetupWindow : Window
         var registryButtons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
         var detect = new Button { Content = "自动发现" };
         var browse = new Button { Content = "选择 PalServer.exe" };
-        var registerDetected = new Button { Content = "登记所选" };
-        registryButtons.Children.Add(detect); registryButtons.Children.Add(registerDetected); registryButtons.Children.Add(browse);
+        var useDetected = new Button { Content = "使用此服务器" };
+        registryButtons.Children.Add(detect); registryButtons.Children.Add(useDetected); registryButtons.Children.Add(browse);
         _panel.Children.Add(registryButtons);
         _panel.Children.Add(_candidates);
-        _panel.Children.Add(_name);
         var actionButtons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-        actionButtons.Children.Add(_relocate); actionButtons.Children.Add(_remove); actionButtons.Children.Add(_continue);
+        actionButtons.Children.Add(_continue); actionButtons.Children.Add(_relocate); actionButtons.Children.Add(_remove);
         _panel.Children.Add(actionButtons);
         _panel.Children.Add(new Border { Height = 1, Background = new SolidColorBrush(Colors.Gray), Margin = new Thickness(0, 8, 0, 8) });
         _panel.Children.Add(new TextBlock { Text = "服务器与存档", FontSize = 20, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
         _panel.Children.Add(_status);
         _panel.Children.Add(_summary);
         var stateButtons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-        stateButtons.Children.Add(_refresh); stateButtons.Children.Add(_attach);
+        stateButtons.Children.Add(_attach); stateButtons.Children.Add(_refresh);
         _panel.Children.Add(stateButtons);
         Content = new ScrollViewer { Content = _panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
 
         Closed += (_, _) => _completion.TrySetResult(null);
         _servers.SelectionChanged += async (_, _) => await RunAsync(AssessSelectedAsync);
-        _candidates.SelectionChanged += (_, _) =>
-        {
-            if (_candidates.SelectedItem is string path && string.IsNullOrWhiteSpace(_name.Text)) _name.Text = Path.GetFileName(path);
-        };
         detect.Click += async (_, _) => await RunAsync(() =>
         {
             _candidates.Items.Clear();
             foreach (var root in new ServerDiscoveryService().AutoDetect()) _candidates.Items.Add(root);
+            if (_candidates.Items.Count == 1) _candidates.SelectedIndex = 0;
             _status.Text = _candidates.Items.Count == 0 ? "常见 Steam 位置中没有找到可用 PalServer。请选择 PalServer.exe。" : "请选择发现的安装，或手动浏览。";
             return Task.CompletedTask;
         });
@@ -86,7 +81,7 @@ public sealed class ServerSetupWindow : Window
             var path = await PickExeAsync();
             if (path is not null) await RegisterAsync(path);
         });
-        registerDetected.Click += async (_, _) => await RunAsync(async () =>
+        useDetected.Click += async (_, _) => await RunAsync(async () =>
         {
             if (_candidates.SelectedItem is not string path)
                 throw new InvalidOperationException("请先选择自动发现的服务器。");
@@ -131,9 +126,8 @@ public sealed class ServerSetupWindow : Window
     private async Task RegisterAsync(string exe)
     {
         var root = ServerRegistryService.ValidateSelectedExe(exe);
-        var name = string.IsNullOrWhiteSpace(_name.Text) ? Path.GetFileName(root) : _name.Text.Trim();
+        var name = string.IsNullOrWhiteSpace(Path.GetFileName(root)) ? "PalServer" : Path.GetFileName(root);
         await _registry.RegisterFromExeAsync(exe, name);
-        _name.Text = "";
         await RefreshAsync();
     }
 
@@ -157,6 +151,7 @@ public sealed class ServerSetupWindow : Window
         {
             _status.Text = "还没有已登记的服务器。先自动发现，或选择 PalServer.exe。";
             _summary.Text = "";
+            _continue.Visibility = _attach.Visibility = Visibility.Collapsed;
             _continue.IsEnabled = _attach.IsEnabled = _relocate.IsEnabled = _remove.IsEnabled = false;
             return;
         }
@@ -165,15 +160,18 @@ public sealed class ServerSetupWindow : Window
         _status.Text = result.Message;
         _summary.Text = "管理器状态与游戏存档分开保存；接入不会改动 SaveGames。";
         _continue.IsEnabled = result.Kind == ServerStateKind.Ready;
+        _continue.Visibility = result.Kind == ServerStateKind.Ready ? Visibility.Visible : Visibility.Collapsed;
+        _attach.Visibility = Visibility.Collapsed;
         _attach.IsEnabled = false;
         if (result.Kind is ServerStateKind.NeedsInitialization or ServerStateKind.EmptyNoWorld)
         {
             var discovered = _serverState.DiscoverWorlds(server);
             _summary.Text = discovered.Count == 0
                 ? "未找到现有世界。请先单独启动 PalServer.exe，待首个世界存盘后关服，再点“重新检查”。"
-                : "已发现当前世界 SaveGames\\0；其他存档可在接入后显式导入。";
-            _attach.Content = "接入当前世界";
+                : $"1. 已选择服务器\n   {server.ServerRoot}\n\n2. 已发现当前存档\n   SaveGames\\0\n   UID: {discovered.Single().WorldGuid}\n\n接入会使用当前 PalWorldSettings.ini 初始化世界设置，不会移动 SaveGames\\0。";
+            _attach.Content = "接入并继续";
             _attach.IsEnabled = discovered.Count > 0;
+            _attach.Visibility = discovered.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
         _relocate.IsEnabled = _remove.IsEnabled = true;
     }
