@@ -13,22 +13,36 @@ public sealed partial class SaveSelectorWindow
     private const double ConstrainedContentHeight = 572;
     private ScrollViewer? _contentScroller;
     private bool _responsiveLayoutInitialized;
+    private double _lastRasterizationScale;
 
     private void RootGrid_Loaded(object sender, RoutedEventArgs e)
     {
         if (_responsiveLayoutInitialized) return;
         _responsiveLayoutInitialized = true;
 
-        var windowId = Win32Interop.GetWindowIdFromWindow(WindowNative.GetWindowHandle(this));
-        var workArea = DisplayArea.GetFromWindowId(windowId, DisplayAreaFallback.Primary).WorkArea;
-        if (_appWindow.Presenter is OverlappedPresenter presenter)
+        var xamlRoot = RootGrid.XamlRoot;
+        _lastRasterizationScale = xamlRoot.RasterizationScale;
+        xamlRoot.Changed += (_, _) =>
         {
-            presenter.PreferredMinimumWidth = Math.Min(WindowPlacement.EffectivePixelsToPhysical(windowId, 900), workArea.Width);
-            presenter.PreferredMinimumHeight = Math.Min(WindowPlacement.EffectivePixelsToPhysical(windowId, 620), workArea.Height);
-        }
+            var scale = xamlRoot.RasterizationScale;
+            if (Math.Abs(scale - _lastRasterizationScale) < 0.001) return;
+            _lastRasterizationScale = scale;
+            ApplyResponsiveMinimum();
+        };
 
+        ApplyResponsiveMinimum();
         RootGrid.SizeChanged += (_, args) => UpdateConstrainedLayout(args.NewSize.Height);
         UpdateConstrainedLayout(RootGrid.ActualHeight);
+    }
+
+    private void ApplyResponsiveMinimum()
+    {
+        var windowId = Win32Interop.GetWindowIdFromWindow(WindowNative.GetWindowHandle(this));
+        var workArea = DisplayArea.GetFromWindowId(windowId, DisplayAreaFallback.Primary).WorkArea;
+        if (_appWindow.Presenter is not OverlappedPresenter presenter) return;
+
+        presenter.PreferredMinimumWidth = Math.Min(WindowPlacement.EffectivePixelsToPhysical(windowId, 900), workArea.Width);
+        presenter.PreferredMinimumHeight = Math.Min(WindowPlacement.EffectivePixelsToPhysical(windowId, 620), workArea.Height);
     }
 
     private void UpdateConstrainedLayout(double windowHeight)
