@@ -9,10 +9,10 @@
         <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
       </ResourceDictionary.MergedDictionaries>
 
-      <Color x:Key="PalBackgroundColor">#F2F2F7</Color>
-      <Color x:Key="PalCardColor">#F8FFFFFF</Color>
-      <Color x:Key="PalCardAltColor">#F2FFFFFF</Color>
-      <Color x:Key="PalBorderColor">#18000000</Color>
+      <Color x:Key="PalBackgroundColor">#FFFFFF</Color>
+      <Color x:Key="PalCardColor">#F2F2F7</Color>
+      <Color x:Key="PalCardAltColor">#F2F2F7</Color>
+      <Color x:Key="PalBorderColor">#16000000</Color>
       <Color x:Key="PalCyanColor">#007AFF</Color>
       <Color x:Key="PalMintColor">#34C759</Color>
       <Color x:Key="PalTextColor">#1C1C1E</Color>
@@ -30,11 +30,11 @@
       <SolidColorBrush x:Key="PalMutedTextBrush" Color="{StaticResource PalMutedTextColor}" />
       <SolidColorBrush x:Key="PalWarmBrush" Color="{StaticResource PalWarmColor}" />
       <SolidColorBrush x:Key="PalDangerBrush" Color="{StaticResource PalDangerColor}" />
-      <SolidColorBrush x:Key="PalWindowTintBrush" Color="#B8F2F2F7" />
-      <SolidColorBrush x:Key="PalTitleBarBrush" Color="#D9F5F5F7" />
-      <SolidColorBrush x:Key="PalInsetBrush" Color="#D9FFFFFF" />
-      <SolidColorBrush x:Key="PalHairlineBrush" Color="#12000000" />
-      <SolidColorBrush x:Key="PalTableHeaderBrush" Color="#66F2F2F7" />
+      <SolidColorBrush x:Key="PalWindowTintBrush" Color="#F7FFFFFF" />
+      <SolidColorBrush x:Key="PalTitleBarBrush" Color="#FAFFFFFF" />
+      <SolidColorBrush x:Key="PalInsetBrush" Color="#E8E8ED" />
+      <SolidColorBrush x:Key="PalHairlineBrush" Color="#14000000" />
+      <SolidColorBrush x:Key="PalTableHeaderBrush" Color="#E8E8ED" />
 
       <FontFamily x:Key="ContentControlThemeFontFamily">Segoe UI Variable Text</FontFamily>
       <CornerRadius x:Key="ControlCornerRadius">8</CornerRadius>
@@ -150,6 +150,20 @@
         <Setter Property="UseSystemFocusVisuals" Value="True" />
         <Setter Property="CornerRadius" Value="8" />
         <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+      </Style>
+
+      <Style x:Key="RestartButtonStyle" TargetType="Button" BasedOn="{StaticResource ColoredPalButtonBaseStyle}">
+        <Setter Property="Background" Value="#F0F5FB" />
+        <Setter Property="Foreground" Value="#1769AA" />
+        <Setter Property="BorderBrush" Value="#C9DCEB" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+      </Style>
+
+      <Style x:Key="NormalExitButtonStyle" TargetType="Button" BasedOn="{StaticResource ColoredPalButtonBaseStyle}">
+        <Setter Property="Background" Value="#DDEBFA" />
+        <Setter Property="Foreground" Value="#005FAE" />
+        <Setter Property="BorderBrush" Value="#B8D2EC" />
         <Setter Property="FontWeight" Value="SemiBold" />
       </Style>
 
