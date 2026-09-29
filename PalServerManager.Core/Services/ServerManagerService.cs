@@ -197,15 +197,20 @@ public sealed class ServerManagerService(
         var currentParked = Path.Combine(context.ServerPaths.SaveRoot, current.ParkedFolder);
         var transactionOld = Path.Combine(context.ServerPaths.SaveRoot, $".pal-new-old-{Guid.NewGuid():N}");
         if (Directory.Exists(currentParked)) throw new IOException($"无法停放当前存档，目标已存在：{currentParked}");
+        var originalRegistry = await File.ReadAllBytesAsync(context.StatePaths.RegistryPath, ct);
+        var originalBuildState = File.Exists(context.StatePaths.BuildStatePath)
+            ? await File.ReadAllBytesAsync(context.StatePaths.BuildStatePath, ct)
+            : null;
         var runtimeIni = await File.ReadAllBytesAsync(context.ServerPaths.SettingsPath, ct);
         var userIni = await File.ReadAllBytesAsync(context.ServerPaths.UserSettingsPath, ct);
         var op = new PendingOperation { Type = "CreateAndStart", FromSlot = current.Id, FromWorldUid = current.WorldGuid, ToSlot = newId };
-        await journal.WriteAsync(op, "Prepared", ct); var moved = false;
+        await journal.WriteAsync(op, "Prepared", ct);
         try
         {
             var values = await worldSettings.PrepareNewWorldRuntimeAsync(choice, current.Id, current.WorldGuid, ct);
             await journal.WriteAsync(op, "ProfileApplied", ct);
-            Directory.Move(context.ServerPaths.ActivePath, transactionOld); Directory.CreateDirectory(context.ServerPaths.ActivePath); moved = true;
+            Directory.Move(context.ServerPaths.ActivePath, transactionOld);
+            Directory.CreateDirectory(context.ServerPaths.ActivePath);
             await slots.ClearWorldGuidForGenerationAsync(ct);
             await processes.StartAsync(ct); await keepAwake.EnsureRunningAsync(ct);
             var info = await WaitForRestReadyAsync(TimeSpan.FromSeconds(120), ct);
@@ -229,25 +234,88 @@ public sealed class ServerManagerService(
             await builds.MarkSuccessfulAsync(slots.GetSlot(registry, newId), await builds.GetCurrentBuildAsync(ct), ct);
             await journal.WriteAsync(op, "Completed", ct); journal.Complete();
         }
-        catch
+        catch (Exception originalError)
         {
-            var recovery = new List<Exception>(); await StopWithoutSavingForRecoveryAsync(recovery);
-            if (moved)
-            {
-                try { if (Directory.Exists(context.ServerPaths.ActivePath)) Directory.Move(context.ServerPaths.ActivePath, Path.Combine(context.ServerPaths.SaveRoot, $"0 - failed-new-{DateTime.Now:yyyyMMdd-HHmmss}")); if (Directory.Exists(transactionOld)) Directory.Move(transactionOld, context.ServerPaths.ActivePath); }
-                catch (Exception error) { recovery.Add(error); }
-            }
-            await RestoreFileAsync(context.ServerPaths.SettingsPath, runtimeIni, recovery); await RestoreFileAsync(context.ServerPaths.UserSettingsPath, userIni, recovery);
-            try { worldSettings.DeleteProfileIfExists(newId); } catch (Exception error) { recovery.Add(error); }
+            var recovery = new List<Exception>();
+            await RecoverCreateAndStartAsync(newId, transactionOld, currentParked, originalRegistry, runtimeIni, userIni,
+                originalBuildState, recovery);
             if (recovery.Count == 0) journal.Complete();
-            if (recovery.Count > 0) throw new AggregateException("新世界创建失败，且旧世界未能完全自动恢复；事务记录已保留。", recovery);
+            if (recovery.Count > 0)
+                throw new AggregateException("新世界创建失败，且旧世界未能完全自动恢复；事务记录已保留。", new[] { originalError }.Concat(recovery));
             throw;
         }
+    }
+
+    internal async Task RecoverCreateAndStartAsync(
+        int newSlotId,
+        string transactionOld,
+        string currentParked,
+        byte[] originalRegistry,
+        byte[] runtimeIni,
+        byte[] userIni,
+        byte[]? originalBuildState,
+        List<Exception> recovery)
+    {
+        await StopWithoutSavingForRecoveryAsync(recovery);
+
+        var temporaryAuthority = Directory.Exists(transactionOld);
+        var parkedAuthority = Directory.Exists(currentParked);
+        if (temporaryAuthority || parkedAuthority)
+        {
+            try
+            {
+                if (temporaryAuthority && parkedAuthority)
+                    throw new InvalidOperationException("旧世界同时存在于临时目录与规范停放目录，恢复来源不唯一；已保留事务记录。 ");
+
+                var authority = temporaryAuthority ? transactionOld : currentParked;
+                if (Directory.Exists(context.ServerPaths.ActivePath))
+                {
+                    var failedNew = Path.Combine(context.ServerPaths.SaveRoot,
+                        $"0 - failed-new-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}");
+                    Directory.Move(context.ServerPaths.ActivePath, failedNew);
+                }
+                if (Directory.Exists(context.ServerPaths.ActivePath))
+                    throw new IOException("恢复旧世界前 active 目录仍然存在，已停止自动恢复。 ");
+                Directory.Move(authority, context.ServerPaths.ActivePath);
+            }
+            catch (Exception error) { recovery.Add(error); }
+        }
+
+        await RestoreFileAsync(context.ServerPaths.SettingsPath, runtimeIni, recovery);
+        await RestoreFileAsync(context.ServerPaths.UserSettingsPath, userIni, recovery);
+        try
+        {
+            await safeFiles.WriteBytesAsync(context.StatePaths.RegistryPath, originalRegistry, keepPrevious: true,
+                cancellationToken: CancellationToken.None);
+        }
+        catch (Exception error) { recovery.Add(error); }
+        await RestoreOptionalFileAsync(context.StatePaths.BuildStatePath, originalBuildState, recovery);
+        try { worldSettings.DeleteProfileIfExists(newSlotId); }
+        catch (Exception error) { recovery.Add(error); }
+        try
+        {
+            var restored = await slots.LoadAsync(CancellationToken.None);
+            await identity.AuditOrThrowAsync(restored, checkInterruptedOperation: false, cancellationToken: CancellationToken.None);
+        }
+        catch (Exception error) { recovery.Add(error); }
     }
 
     private async Task StopWithoutSavingForRecoveryAsync(List<Exception> errors)
     { if (!processes.GetSnapshot().IsRunning) return; try { await processes.ForceStopAsync(CancellationToken.None); } catch (Exception e) { errors.Add(e); } }
     private async Task RestoreFileAsync(string path, byte[] content, List<Exception> errors)
     { try { await safeFiles.WriteBytesAsync(path, content, keepPrevious: true); } catch (Exception e) { errors.Add(e); } }
+    private async Task RestoreOptionalFileAsync(string path, byte[]? content, List<Exception> errors)
+    {
+        try
+        {
+            if (content is null)
+            {
+                if (File.Exists(path)) File.Delete(path);
+                return;
+            }
+            await safeFiles.WriteBytesAsync(path, content, keepPrevious: true);
+        }
+        catch (Exception e) { errors.Add(e); }
+    }
     private void RequireRunning() { if (!processes.GetSnapshot().IsRunning) throw new InvalidOperationException("PalServer 当前没有运行。"); }
 }

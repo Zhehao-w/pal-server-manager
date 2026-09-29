@@ -18,8 +18,9 @@ public sealed class PlayerRosterService(PalContext context, SafeFileService file
     private readonly Dictionary<string, DateTimeOffset> _sessionStarts = new(StringComparer.OrdinalIgnoreCase);
     private DateTimeOffset _nextSaveScanUtc = DateTimeOffset.MinValue;
     private DateTimeOffset _nextCheckpointUtc = DateTimeOffset.MinValue;
+    private RosterReadState _currentReadState = RosterReadState.Empty;
     private bool _dirty;
-    private bool _disposed;
+    private int _disposed;
 
     public async Task<PlayerRosterSnapshot> RefreshAsync(
         string worldGuid,
@@ -29,11 +30,11 @@ public sealed class PlayerRosterService(PalContext context, SafeFileService file
         DateTimeOffset now,
         CancellationToken cancellationToken = default)
     {
-        await _gate.WaitAsync(cancellationToken);
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             ThrowIfDisposed();
-            await EnsureLoadedAsync(cancellationToken);
+            await EnsureLoadedAsync(cancellationToken).ConfigureAwait(false);
             var importantChange = SwitchWorldIfNeeded(worldGuid, playersDirectory, now);
 
             if (now >= _nextSaveScanUtc || mode == PlayerPresenceMode.ServerStopped)
@@ -60,11 +61,16 @@ public sealed class PlayerRosterService(PalContext context, SafeFileService file
 
             if (importantChange || (_dirty && now >= _nextCheckpointUtc))
             {
-                await SaveDocumentAsync(cancellationToken);
+                await SaveDocumentAsync(cancellationToken).ConfigureAwait(false);
                 _nextCheckpointUtc = now.AddMinutes(5);
             }
 
-            return CreateSnapshot(now);
+            var snapshot = CreateSnapshot(now);
+            var readState = new RosterReadState(
+                snapshot,
+                new Dictionary<string, DateTimeOffset>(_sessionStarts, StringComparer.OrdinalIgnoreCase));
+            Volatile.Write(ref _currentReadState, readState);
+            return snapshot;
         }
         finally
         {
@@ -72,18 +78,23 @@ public sealed class PlayerRosterService(PalContext context, SafeFileService file
         }
     }
 
+    // UI callers only need a stable read model. Never synchronously wait on the
+    // refresh gate here; elapsed online durations are rendered from the supplied
+    // timestamp using the immutable session-start copy captured by RefreshAsync.
     public PlayerRosterSnapshot GetCurrentSnapshot(DateTimeOffset now)
     {
-        _gate.Wait();
-        try
+        ThrowIfDisposed();
+        var state = Volatile.Read(ref _currentReadState);
+        if (state.SessionStarts.Count == 0) return state.Snapshot;
+
+        var rows = state.Snapshot.Players.Select(row =>
         {
-            ThrowIfDisposed();
-            return CreateSnapshot(now);
-        }
-        finally
-        {
-            _gate.Release();
-        }
+            if (!string.Equals(row.Status, "在线", StringComparison.Ordinal) ||
+                !state.SessionStarts.TryGetValue(row.PlayerId, out var started)) return row;
+            return row with { OnlineDuration = FormatOnlineDuration(now - started) };
+        }).ToArray();
+
+        return state.Snapshot with { Players = rows };
     }
 
     private async Task EnsureLoadedAsync(CancellationToken cancellationToken)
@@ -98,7 +109,7 @@ public sealed class PlayerRosterService(PalContext context, SafeFileService file
         try
         {
             await using var stream = new FileStream(context.StatePaths.PlayerActivityPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 4096, true);
-            _document = await JsonSerializer.DeserializeAsync<PlayerActivityDocument>(stream, JsonOptions, cancellationToken)
+            _document = await JsonSerializer.DeserializeAsync<PlayerActivityDocument>(stream, JsonOptions, cancellationToken).ConfigureAwait(false)
                 ?? throw new InvalidOperationException("PlayerActivity.json 为空。");
             _document.Worlds ??= [];
             foreach (var world in _document.Worlds.Values) world.Players ??= [];
@@ -291,14 +302,20 @@ public sealed class PlayerRosterService(PalContext context, SafeFileService file
     private async Task SaveDocumentAsync(CancellationToken cancellationToken)
     {
         if (!_dirty || _document is null) return;
-        await files.WriteJsonAsync(context.StatePaths.PlayerActivityPath, _document, JsonOptions, keepPrevious: true, cancellationToken: cancellationToken);
+        // SafeFileService itself is async and may capture a UI SynchronizationContext.
+        // Run the persistence pipeline on the thread pool so a synchronous shutdown
+        // wait can never form a UI-context cycle with the refresh gate.
+        await Task.Run(
+            () => files.WriteJsonAsync(context.StatePaths.PlayerActivityPath, _document, JsonOptions, keepPrevious: true, cancellationToken: cancellationToken),
+            cancellationToken).ConfigureAwait(false);
         _dirty = false;
     }
 
     private void SaveDocument()
     {
         if (!_dirty || _document is null) return;
-        files.WriteJsonAsync(context.StatePaths.PlayerActivityPath, _document, JsonOptions, keepPrevious: true).GetAwaiter().GetResult();
+        Task.Run(() => files.WriteJsonAsync(context.StatePaths.PlayerActivityPath, _document, JsonOptions, keepPrevious: true))
+            .GetAwaiter().GetResult();
         _dirty = false;
     }
 
@@ -328,22 +345,30 @@ public sealed class PlayerRosterService(PalContext context, SafeFileService file
 
     private void ThrowIfDisposed()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
     }
 
     public void Dispose()
     {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
         _gate.Wait();
         try
         {
-            if (_disposed) return;
             EndAllSessions(DateTimeOffset.Now);
             try { SaveDocument(); } catch { }
-            _disposed = true;
         }
         finally
         {
             _gate.Release();
         }
+    }
+
+    private sealed record RosterReadState(
+        PlayerRosterSnapshot Snapshot,
+        IReadOnlyDictionary<string, DateTimeOffset> SessionStarts)
+    {
+        public static RosterReadState Empty { get; } = new(
+            new PlayerRosterSnapshot([], 0, 0, false),
+            new Dictionary<string, DateTimeOffset>(StringComparer.OrdinalIgnoreCase));
     }
 }
