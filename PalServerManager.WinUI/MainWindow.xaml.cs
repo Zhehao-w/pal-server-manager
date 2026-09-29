@@ -193,7 +193,7 @@ public sealed partial class MainWindow : Window
         body.Children.Add(new Border
         {
             Style = Style("GroupedSurfaceStyle"),
-            Padding = new Thickness(12, 8),
+            Padding = new Thickness(12, 8, 12, 8),
             Child = new TextBlock { Text = $"版本标识  {build}", FontFamily = new FontFamily("Cascadia Mono, Consolas"), FontSize = 11, TextTrimming = TextTrimming.CharacterEllipsis }
         });
         var dialog = new ContentDialog
