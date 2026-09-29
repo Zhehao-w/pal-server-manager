@@ -13,7 +13,7 @@
     <Grid Grid.Row="0" Background="{StaticResource PalTitleBarBrush}" Padding="18,0,148,0">
       <Grid x:Name="TitleBarDragRegion">
         <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
-          <Image Source="Assets/ManagerIconCircular.png" Width="24" Height="24" />
+          <Image Source="ms-appx:///Assets/ManagerIconCircular.png" Width="24" Height="24" VerticalAlignment="Center" />
           <TextBlock Text="PalServerManager" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
           <TextBlock Text="·" Foreground="{StaticResource PalMutedTextBrush}" FontSize="11" VerticalAlignment="Center" />
           <TextBlock VerticalAlignment="Center" Foreground="{StaticResource PalMutedTextBrush}" FontSize="11"><Run x:Name="VersionRun" /></TextBlock>
@@ -31,7 +31,7 @@
         <RowDefinition Height="Auto" />
       </Grid.RowDefinitions>
 
-      <StackPanel Spacing="3" Margin="2,0,2,2">
+      <StackPanel Spacing="3" Margin="0,0,0,2">
         <TextBlock Text="选择存档" FontSize="23" FontWeight="SemiBold" />
         <TextBlock Text="启动已有世界，或创建一个新的管理存档。管理标签不会修改游戏内世界名称。" Foreground="{StaticResource PalMutedTextBrush}" FontSize="11" />
       </StackPanel>
@@ -50,7 +50,7 @@
 
       <Grid Grid.Row="2" RowSpacing="6">
         <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
-        <Grid Margin="8,0">
+        <Grid>
           <TextBlock Text="存档" Style="{StaticResource SectionHeadingStyle}" VerticalAlignment="Center" />
           <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
             <TextBlock Text="双击直接启动" Foreground="{StaticResource PalMutedTextBrush}" FontSize="10" VerticalAlignment="Center" />
@@ -88,7 +88,7 @@
 
       <Grid Grid.Row="3" RowSpacing="6">
         <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-        <TextBlock Text="所选存档" Style="{StaticResource SectionHeadingStyle}" Margin="8,0" />
+        <TextBlock Text="所选存档" Style="{StaticResource SectionHeadingStyle}" />
         <Border Grid.Row="1" Style="{StaticResource GroupedSurfaceStyle}" Padding="14,10">
           <Grid ColumnSpacing="9">
             <Grid.ColumnDefinitions><ColumnDefinition Width="145" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
@@ -112,7 +112,7 @@
 
       <Grid Grid.Row="4" RowSpacing="6">
         <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-        <TextBlock Text="创建新存档" Style="{StaticResource SectionHeadingStyle}" Margin="8,0" />
+        <TextBlock Text="创建新存档" Style="{StaticResource SectionHeadingStyle}" />
         <Border Grid.Row="1" Style="{StaticResource GroupedSurfaceStyle}" Padding="14,10">
           <Grid ColumnSpacing="9" RowSpacing="8">
             <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
@@ -128,7 +128,7 @@
         </Border>
       </Grid>
 
-      <Grid Grid.Row="5" ColumnSpacing="10" Margin="2,2,2,0">
+      <Grid Grid.Row="5" ColumnSpacing="10" Margin="0,2,0,0">
         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
         <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
           <Button Content="从备份回档并启动…" Command="{x:Bind ViewModel.RollbackCommand}" Style="{StaticResource CompactPalButtonStyle}" />
