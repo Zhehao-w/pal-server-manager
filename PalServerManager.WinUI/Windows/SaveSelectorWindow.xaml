@@ -2,21 +2,24 @@
     x:Class="HaoHaoTianTian.PalHR.Windows.SaveSelectorWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    Title="浩浩添添 Pal 人力资源部">
+    Title="PalServerManager">
 
-  <Grid x:Name="RootGrid" Background="{StaticResource PalBackgroundBrush}">
+  <Grid x:Name="RootGrid" Background="{StaticResource PalWindowTintBrush}">
     <Grid.RowDefinitions>
       <RowDefinition Height="48" />
       <RowDefinition Height="*" />
     </Grid.RowDefinitions>
 
-    <Grid Grid.Row="0" Background="#B818242C" Padding="14,0,148,0">
+    <Grid Grid.Row="0" Background="#7517191C" Padding="14,0,148,0">
       <Grid x:Name="TitleBarDragRegion">
+        <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
+        <Image Source="Assets/ManagerIconCircular.png" Width="23" Height="23" />
         <TextBlock VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
-          <Run Text="浩浩添添 Pal 人力资源部" FontSize="16" FontWeight="SemiBold" />
+          <Run Text="PalServerManager" FontSize="16" FontWeight="SemiBold" />
           <Run Text="  ·  " FontSize="12" Foreground="{StaticResource PalMutedTextBrush}" />
           <Run x:Name="VersionRun" FontSize="12" Foreground="{StaticResource PalCyanBrush}" />
         </TextBlock>
+        </StackPanel>
       </Grid>
     </Grid>
 
@@ -49,15 +52,14 @@
           <Grid.RowDefinitions><RowDefinition Height="43" /><RowDefinition Height="35" /><RowDefinition Height="*" /></Grid.RowDefinitions>
           <Grid Padding="14,0"><TextBlock Text="存档列表" FontWeight="SemiBold" VerticalAlignment="Center" /><StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" VerticalAlignment="Center"><TextBlock Text="双击也可直接启动" VerticalAlignment="Center" Foreground="{StaticResource PalMutedTextBrush}" FontSize="11" /><Button Content="重新扫描" Click="Rescan_Click" /><Button Content="导入存档…" Click="ImportSave_Click" /></StackPanel></Grid>
           <Grid Grid.Row="1" Background="#C62A3D46" Padding="12,0" ColumnSpacing="10">
-            <Grid.ColumnDefinitions><ColumnDefinition Width="45" /><ColumnDefinition Width="140" /><ColumnDefinition Width="58" /><ColumnDefinition Width="290" /><ColumnDefinition Width="76" /><ColumnDefinition Width="58" /><ColumnDefinition Width="128" /></Grid.ColumnDefinitions>
+            <Grid.ColumnDefinitions><ColumnDefinition Width="45" /><ColumnDefinition Width="1.1*" MinWidth="110" /><ColumnDefinition Width="58" /><ColumnDefinition Width="2.1*" MinWidth="180" /><ColumnDefinition Width="76" /><ColumnDefinition Width="58" /><ColumnDefinition Width="1.1*" MinWidth="116" /></Grid.ColumnDefinitions>
             <TextBlock Text="编号" Style="{StaticResource TableHeaderTextStyle}" /><TextBlock Grid.Column="1" Text="标签" Style="{StaticResource TableHeaderTextStyle}" /><TextBlock Grid.Column="2" Text="状态" Style="{StaticResource TableHeaderTextStyle}" /><TextBlock Grid.Column="3" Text="存档 UID · LocalData 文件夹" Style="{StaticResource TableHeaderTextStyle}" /><TextBlock Grid.Column="4" Text="大小" Style="{StaticResource TableHeaderTextStyle}" /><TextBlock Grid.Column="5" Text="玩家" Style="{StaticResource TableHeaderTextStyle}" /><TextBlock Grid.Column="6" Text="最后保存" Style="{StaticResource TableHeaderTextStyle}" />
           </Grid>
-          <ListView Grid.Row="2" ItemsSource="{x:Bind ViewModel.Saves}" SelectedItem="{x:Bind ViewModel.SelectedSave, Mode=TwoWay}" SelectionMode="Single" DoubleTapped="SaveList_DoubleTapped">
-            <ListView.ItemContainerStyle><Style TargetType="ListViewItem"><Setter Property="HorizontalContentAlignment" Value="Stretch" /></Style></ListView.ItemContainerStyle>
+          <ListView Grid.Row="2" ItemsSource="{x:Bind ViewModel.Saves}" SelectedItem="{x:Bind ViewModel.SelectedSave, Mode=TwoWay}" SelectionMode="Single" DoubleTapped="SaveList_DoubleTapped" ItemContainerStyle="{StaticResource SelectableSaveItemStyle}">
             <ListView.ItemTemplate>
               <DataTemplate>
                 <Grid Height="39" Padding="12,0" ColumnSpacing="10">
-                  <Grid.ColumnDefinitions><ColumnDefinition Width="45" /><ColumnDefinition Width="140" /><ColumnDefinition Width="58" /><ColumnDefinition Width="290" /><ColumnDefinition Width="76" /><ColumnDefinition Width="58" /><ColumnDefinition Width="128" /></Grid.ColumnDefinitions>
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="45" /><ColumnDefinition Width="1.1*" MinWidth="110" /><ColumnDefinition Width="58" /><ColumnDefinition Width="2.1*" MinWidth="180" /><ColumnDefinition Width="76" /><ColumnDefinition Width="58" /><ColumnDefinition Width="1.1*" MinWidth="116" /></Grid.ColumnDefinitions>
                   <TextBlock Text="{Binding Id}" Style="{StaticResource TableCellTextStyle}" /><TextBlock Grid.Column="1" Text="{Binding Tag}" Style="{StaticResource TableCellTextStyle}" TextTrimming="CharacterEllipsis" /><TextBlock Grid.Column="2" Text="{Binding State}" Style="{StaticResource TableCellTextStyle}" /><TextBlock Grid.Column="3" Text="{Binding WorldUid}" Style="{StaticResource TableCellTextStyle}" TextTrimming="CharacterEllipsis" FontFamily="Cascadia Mono, Consolas" FontSize="11" /><TextBlock Grid.Column="4" Text="{Binding Size}" Style="{StaticResource TableCellTextStyle}" /><TextBlock Grid.Column="5" Text="{Binding Players}" Style="{StaticResource TableCellTextStyle}" /><TextBlock Grid.Column="6" Text="{Binding Updated}" Style="{StaticResource TableCellTextStyle}" FontSize="11" />
                 </Grid>
               </DataTemplate>

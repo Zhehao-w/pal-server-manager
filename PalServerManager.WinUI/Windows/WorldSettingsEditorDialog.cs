@@ -96,8 +96,8 @@ public static class WorldSettingsEditorDialog
         var scroll = new ScrollViewer
         {
             Content = body,
-            MaxWidth = 860,
-            MaxHeight = 670,
+            MaxWidth = 820,
+            MaxHeight = 640,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
         };
@@ -109,7 +109,7 @@ public static class WorldSettingsEditorDialog
             PrimaryButtonText = session.IsDraft ? "采用此设置" : "保存设置",
             CloseButtonText = "取消",
             DefaultButton = ContentDialogButton.Primary,
-            MinWidth = 900
+            MinWidth = 720
         };
         if (allowRestart && serverRunning)
         {
@@ -144,7 +144,7 @@ public static class WorldSettingsEditorDialog
         IDictionary<string, Control> controls,
         string? note = null)
     {
-        var panel = new StackPanel { Spacing = 2 };
+        var panel = new StackPanel { Spacing = 0, Padding = new Thickness(8, 4, 8, 8) };
         if (!string.IsNullOrWhiteSpace(note))
         {
             panel.Children.Add(new TextBlock
@@ -158,10 +158,10 @@ public static class WorldSettingsEditorDialog
         }
         foreach (var definition in definitions)
         {
-            var row = new Grid { MinHeight = 56, ColumnSpacing = 14, Padding = new Thickness(4, 3, 4, 3) };
+            var row = new Grid { MinHeight = 64, ColumnSpacing = 18, Padding = new Thickness(8, 6, 8, 6) };
             ToolTipService.SetToolTip(row, $"INI: {definition.Key}\n{definition.Description}");
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(260) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(240) });
             var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
             text.Children.Add(new TextBlock { Text = definition.Label, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
             text.Children.Add(new TextBlock { Text = definition.Description, Foreground = Brush("PalMutedTextBrush"), FontSize = 11, TextWrapping = TextWrapping.Wrap });
@@ -171,6 +171,8 @@ public static class WorldSettingsEditorDialog
             row.Children.Add(text);
             row.Children.Add(control);
             panel.Children.Add(row);
+            if (!ReferenceEquals(definition, definitions[^1]))
+                panel.Children.Add(new Border { Height = 1, Background = Brush("PalBorderBrush"), Margin = new Thickness(8, 0, 8, 0), Opacity = 0.55 });
             controls[definition.Key] = control;
         }
         return new Expander

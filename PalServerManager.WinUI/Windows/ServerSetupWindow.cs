@@ -19,18 +19,18 @@ public sealed class ServerSetupWindow : Window
     private readonly TaskCompletionSource<RegisteredServer?> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly ComboBox _servers = new() { MinWidth = 430, PlaceholderText = "选择已登记的服务器" };
     private readonly ComboBox _candidates = new() { MinWidth = 430, PlaceholderText = "选择自动发现的 PalServer" };
-    private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap, MaxWidth = 640 };
-    private readonly TextBlock _summary = new() { TextWrapping = TextWrapping.Wrap, MaxWidth = 640 };
-    private readonly Button _continue = new() { Content = "进入管理器", Style = (Style)Application.Current.Resources["AccentButtonStyle"] };
-    private readonly Button _attach = new() { Content = "接入并继续", Style = (Style)Application.Current.Resources["AccentButtonStyle"] };
+    private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap, MaxWidth = 640, Foreground = Brush("PalMintBrush") };
+    private readonly TextBlock _summary = new() { TextWrapping = TextWrapping.Wrap, MaxWidth = 640, Foreground = Brush("PalMutedTextBrush") };
+    private readonly Button _continue = new() { Content = "进入管理器", Style = Style("PrimaryPalButtonStyle") };
+    private readonly Button _attach = new() { Content = "接入并继续", Style = Style("PrimaryPalButtonStyle") };
     private readonly Button _refresh = new() { Content = "重新检查" };
     private readonly Button _relocate = new() { Content = "重新定位" };
     private readonly Button _remove = new() { Content = "移除注册（保留状态）" };
-    private readonly StackPanel _panel = new() { Spacing = 12, Padding = new Thickness(26) };
+    private readonly StackPanel _panel = new() { Spacing = 14, Padding = new Thickness(30) };
     private readonly StackPanel _registryButtons = new() { Orientation = Orientation.Horizontal, Spacing = 8 };
     private readonly StackPanel _managementButtons = new() { Orientation = Orientation.Horizontal, Spacing = 8 };
     private readonly Button _useDetected = new() { Content = "使用此服务器" };
-    private readonly Border _divider = new() { Height = 1, Background = new SolidColorBrush(Colors.Gray), Margin = new Thickness(0, 8, 0, 8) };
+    private readonly Border _divider = new() { Height = 1, Background = Brush("PalBorderBrush"), Margin = new Thickness(0, 8, 0, 8) };
     private ServerRegistryDocument _document = new();
     private string? _pendingRoot;
     private bool _busy;
@@ -51,8 +51,9 @@ public sealed class ServerSetupWindow : Window
             presenter.PreferredMinimumHeight = 590;
         }
 
+        _panel.Children.Add(new TextBlock { Text = App.ProductName, FontSize = 13, Foreground = Brush("PalMutedTextBrush") });
         _panel.Children.Add(new TextBlock { Text = "连接 PalServer", FontSize = 28, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
-        _panel.Children.Add(new TextBlock { Text = "管理器安装目录、服务器目录和每台服务器的管理状态彼此独立。这里不会修改游戏存档。", TextWrapping = TextWrapping.Wrap });
+        _panel.Children.Add(new TextBlock { Text = "管理器安装目录、服务器目录和每台服务器的管理状态彼此独立。这里不会修改游戏存档。", TextWrapping = TextWrapping.Wrap, Foreground = Brush("PalMutedTextBrush") });
         _panel.Children.Add(_servers);
         var detect = new Button { Content = "自动发现" };
         var browse = new Button { Content = "选择 PalServer.exe" };
@@ -62,7 +63,7 @@ public sealed class ServerSetupWindow : Window
         _managementButtons.Children.Add(_continue); _managementButtons.Children.Add(_relocate); _managementButtons.Children.Add(_remove);
         _panel.Children.Add(_managementButtons);
         _panel.Children.Add(_divider);
-        _panel.Children.Add(new TextBlock { Text = "服务器与存档", FontSize = 20, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+        _panel.Children.Add(new TextBlock { Text = "服务器与存档", FontSize = 18, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
         _panel.Children.Add(_status);
         _panel.Children.Add(_summary);
         var stateButtons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
@@ -153,6 +154,9 @@ public sealed class ServerSetupWindow : Window
 
     public Task<RegisteredServer?> ShowAsync() { Activate(); _ = RunAsync(RefreshAsync); return _completion.Task; }
     public void Dismiss() => Close();
+
+    private static Brush Brush(string key) => (Brush)Application.Current.Resources[key];
+    private static Style Style(string key) => (Style)Application.Current.Resources[key];
 
     private async Task RegisterAsync(string exe)
     {

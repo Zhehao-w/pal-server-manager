@@ -4,14 +4,12 @@ using HaoHaoTianTian.PalHR.ViewModels;
 using HaoHaoTianTian.PalHR.Windows;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using System.Diagnostics;
-using System.Runtime.InteropServices;
 
 namespace HaoHaoTianTian.PalHR;
 
 public partial class App : Application
 {
-    public const string ProductName = "浩浩添添 Pal 人力资源部";
+    public const string ProductName = "PalServerManager";
     public const string Version = ManagerProduct.Version;
     private static readonly HttpClient HttpClient = new();
     private readonly Mutex _singleInstance;
@@ -30,7 +28,6 @@ public partial class App : Application
     {
         if (!_isPrimary)
         {
-            BringExistingManagerForward();
             _singleInstance.Dispose();
             Environment.Exit(0);
             return;
@@ -102,36 +99,14 @@ public partial class App : Application
         catch (Exception exception)
         {
             setup?.Dismiss();
-            var window = new Window { Title = ProductName };
-            var panel = new StackPanel { Padding = new Thickness(28), Spacing = 12 };
+            var window = new Window { Title = $"{ProductName} · v{Version}", SystemBackdrop = new Microsoft.UI.Xaml.Media.MicaBackdrop() };
+            var panel = new StackPanel { Padding = new Thickness(32), Spacing = 12, Background = (Microsoft.UI.Xaml.Media.Brush)Resources["PalWindowTintBrush"] };
+            panel.Children.Add(new TextBlock { Text = ProductName, FontSize = 14, Foreground = (Microsoft.UI.Xaml.Media.Brush)Resources["PalMutedTextBrush"] });
             panel.Children.Add(new TextBlock { Text = "管理器无法启动", FontSize = 24, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
-            panel.Children.Add(new TextBlock { Text = exception.Message, TextWrapping = TextWrapping.Wrap, MaxWidth = 640 });
+            panel.Children.Add(new TextBlock { Text = exception.Message, TextWrapping = TextWrapping.Wrap, MaxWidth = 640, Foreground = (Microsoft.UI.Xaml.Media.Brush)Resources["PalMutedTextBrush"] });
             window.Content = panel;
             window.Activate();
         }
     }
 
-    private static void BringExistingManagerForward()
-    {
-        foreach (var process in Process.GetProcesses())
-        {
-            using (process)
-            {
-                try
-                {
-                    if (process.Id == Environment.ProcessId || process.MainWindowHandle == IntPtr.Zero) continue;
-                    if (!string.Equals(process.MainModule?.FileName, Environment.ProcessPath, StringComparison.OrdinalIgnoreCase)) continue;
-                    var title = process.MainWindowTitle;
-                    if (!title.StartsWith(ProductName, StringComparison.Ordinal) && !title.StartsWith("PalServer 管理器", StringComparison.Ordinal)) continue;
-                    ShowWindow(process.MainWindowHandle, 9);
-                    SetForegroundWindow(process.MainWindowHandle);
-                    return;
-                }
-                catch { }
-            }
-        }
-    }
-
-    [DllImport("user32.dll")] private static extern bool SetForegroundWindow(IntPtr window);
-    [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr window, int command);
 }
