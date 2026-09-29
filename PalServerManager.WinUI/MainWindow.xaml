@@ -4,7 +4,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="PalServerManager">
 
-  <Grid x:Name="RootGrid" Background="Transparent">
+  <Grid x:Name="RootGrid" Background="Transparent" Loaded="RootGrid_Loaded">
     <Grid.RowDefinitions>
       <RowDefinition Height="52" />
       <RowDefinition Height="*" />
@@ -37,7 +37,7 @@
           <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="38" /></Grid.RowDefinitions>
           <Grid ColumnSpacing="22">
             <Grid.ColumnDefinitions><ColumnDefinition Width="1.2*" /><ColumnDefinition Width="1.2*" /><ColumnDefinition Width="0.8*" /><ColumnDefinition Width="0.8*" /></Grid.ColumnDefinitions>
-            <StackPanel Spacing="2"><TextBlock Text="{x:Bind ViewModel.ServerIdentity, Mode=OneWay}" Style="{StaticResource MetricLabelStyle}" TextTrimming="CharacterEllipsis" /><TextBlock Text="{x:Bind ViewModel.ServerState, Mode=OneWay}" Style="{StaticResource MetricValueStyle}" Foreground="{StaticResource PalMintBrush}" /><TextBlock Text="{x:Bind ViewModel.PowerState, Mode=OneWay}" Foreground="{StaticResource PalMutedTextBrush}" FontSize="11" /></StackPanel>
+            <StackPanel Spacing="2"><TextBlock Text="{x:Bind ViewModel.ServerIdentity, Mode=OneWay}" Style="{StaticResource MetricLabelStyle}" TextTrimming="CharacterEllipsis" /><TextBlock Text="{x:Bind ViewModel.ServerState, Mode=OneWay}" Style="{StaticResource MetricValueStyle}" Foreground="{StaticResource PalTextBrush}" /><TextBlock Text="{x:Bind ViewModel.PowerState, Mode=OneWay}" Foreground="{StaticResource PalMutedTextBrush}" FontSize="11" /></StackPanel>
             <StackPanel Grid.Column="1" Spacing="2"><TextBlock Text="当前存档" Style="{StaticResource MetricLabelStyle}" /><TextBlock Text="{x:Bind ViewModel.ActiveSave, Mode=OneWay}" Style="{StaticResource MetricValueStyle}" /></StackPanel>
             <StackPanel Grid.Column="2" Spacing="2"><TextBlock Text="在线玩家" Style="{StaticResource MetricLabelStyle}" /><TextBlock Text="{x:Bind ViewModel.PlayerCount, Mode=OneWay}" Style="{StaticResource MetricValueStyle}" /></StackPanel>
             <StackPanel Grid.Column="3" Spacing="2"><TextBlock Text="REST API" Style="{StaticResource MetricLabelStyle}" /><TextBlock Text="{x:Bind ViewModel.RestState, Mode=OneWay}" Style="{StaticResource MetricValueStyle}" /></StackPanel>
@@ -71,7 +71,7 @@
           <Grid Padding="14,0">
             <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
               <TextBlock Text="玩家" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
-              <TextBlock Text="{x:Bind ViewModel.PlayerRosterSummary, Mode=OneWay}" Foreground="{StaticResource PalMintBrush}" FontSize="11" VerticalAlignment="Center" />
+              <TextBlock Text="{x:Bind ViewModel.PlayerRosterSummary, Mode=OneWay}" Foreground="{StaticResource PalMutedTextBrush}" FontSize="11" VerticalAlignment="Center" />
             </StackPanel>
             <TextBlock Text="在线状态每 10 秒刷新" Foreground="{StaticResource PalMutedTextBrush}" FontSize="11" HorizontalAlignment="Right" VerticalAlignment="Center" />
           </Grid>
