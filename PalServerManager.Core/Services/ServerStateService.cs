@@ -76,6 +76,7 @@ public sealed class ServerStateService(AppPaths app, SafeFileService files)
         var stage = Path.Combine(app.ServersStateRoot, $".setup-{server.Id}-{Guid.NewGuid():N}");
         Directory.CreateDirectory(stage);
         string? preserved = null;
+        var activated = false;
         try
         {
             await files.WriteJsonAsync(Path.Combine(stage, "SaveSlots.json"), registry, cancellationToken: cancellationToken);
@@ -113,12 +114,20 @@ public sealed class ServerStateService(AppPaths app, SafeFileService files)
                 }
                 else Directory.Delete(root);
             }
-            try { Directory.Move(stage, root); }
+            try
+            {
+                Directory.Move(stage, root);
+                activated = true;
+                await ValidateStateAsync(root, server, cancellationToken);
+            }
             catch
             {
-                if (preserved is not null && !Directory.Exists(root)) Directory.Move(preserved, root);
+                if (activated && Directory.Exists(root)) Directory.Delete(root, recursive: true);
+                if (preserved is not null && Directory.Exists(preserved) && !Directory.Exists(root))
+                    Directory.Move(preserved, root);
                 throw;
             }
+            if (preserved is not null && Directory.Exists(preserved)) Directory.Delete(preserved, recursive: true);
         }
         catch
         {
@@ -168,6 +177,7 @@ public sealed class ServerStateService(AppPaths app, SafeFileService files)
                 throw new InvalidOperationException($"存档 {slot.Id} 的世界设置身份无效。");
             if (profile.SchemaVersion == WorldSettingsService.CurrentProfileSchema)
             {
+                WorldSettingsValueValidator.ValidateProfile(profile.Values);
                 var staged = new PalContext(AppPaths.ForExplicitRoots(root, root),
                     new ServerPaths(server.ServerRoot), new ServerStatePaths(root));
                 var worldSettings = new WorldSettingsService(staged, new LoggingService(staged), new SafeFileService());
