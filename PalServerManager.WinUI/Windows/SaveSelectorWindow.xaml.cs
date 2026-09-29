@@ -134,14 +134,15 @@ public sealed partial class SaveSelectorWindow : Window
 
     private static void ConfigureTitleBar(AppWindowTitleBar titleBar)
     {
-        titleBar.ButtonForegroundColor = Colors.White;
-        titleBar.ButtonInactiveForegroundColor = global::Windows.UI.Color.FromArgb(150, 242, 247, 248);
+        var foreground = global::Windows.UI.Color.FromArgb(255, 28, 28, 30);
+        titleBar.ButtonForegroundColor = foreground;
+        titleBar.ButtonInactiveForegroundColor = global::Windows.UI.Color.FromArgb(120, 28, 28, 30);
         titleBar.ButtonBackgroundColor = Colors.Transparent;
         titleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
-        titleBar.ButtonHoverBackgroundColor = global::Windows.UI.Color.FromArgb(42, 255, 255, 255);
-        titleBar.ButtonHoverForegroundColor = Colors.White;
-        titleBar.ButtonPressedBackgroundColor = global::Windows.UI.Color.FromArgb(70, 255, 255, 255);
-        titleBar.ButtonPressedForegroundColor = Colors.White;
+        titleBar.ButtonHoverBackgroundColor = global::Windows.UI.Color.FromArgb(18, 0, 0, 0);
+        titleBar.ButtonHoverForegroundColor = foreground;
+        titleBar.ButtonPressedBackgroundColor = global::Windows.UI.Color.FromArgb(30, 0, 0, 0);
+        titleBar.ButtonPressedForegroundColor = foreground;
     }
 
     private void SaveList_DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
