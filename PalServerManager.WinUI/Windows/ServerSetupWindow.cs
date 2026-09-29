@@ -26,11 +26,10 @@ public sealed class ServerSetupWindow : Window
     private readonly Button _refresh = new() { Content = "重新检查" };
     private readonly Button _relocate = new() { Content = "重新定位" };
     private readonly Button _remove = new() { Content = "移除注册（保留状态）" };
-    private readonly StackPanel _panel = new() { Spacing = 12, Padding = new Thickness(26) };
+    private readonly StackPanel _panel = new() { Spacing = 14, Padding = new Thickness(28, 22, 28, 28) };
     private readonly StackPanel _registryButtons = new() { Orientation = Orientation.Horizontal, Spacing = 8 };
     private readonly StackPanel _managementButtons = new() { Orientation = Orientation.Horizontal, Spacing = 8 };
     private readonly Button _useDetected = new() { Content = "使用此服务器" };
-    private readonly Border _divider = new() { Height = 1, Background = new SolidColorBrush(Colors.Gray), Margin = new Thickness(0, 8, 0, 8) };
     private ServerRegistryDocument _document = new();
     private string? _pendingRoot;
     private bool _busy;
@@ -51,24 +50,30 @@ public sealed class ServerSetupWindow : Window
             presenter.PreferredMinimumHeight = 590;
         }
 
+        _panel.Children.Add(new TextBlock { Text = $"PalServerManager  ·  v{App.Version}", FontSize = 14, Foreground = Brush("PalMutedTextBrush") });
         _panel.Children.Add(new TextBlock { Text = "连接 PalServer", FontSize = 28, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
-        _panel.Children.Add(new TextBlock { Text = "管理器安装目录、服务器目录和每台服务器的管理状态彼此独立。这里不会修改游戏存档。", TextWrapping = TextWrapping.Wrap });
-        _panel.Children.Add(_servers);
+        _panel.Children.Add(new TextBlock { Text = "选择服务器", FontSize = 16, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+        var selection = new StackPanel { Spacing = 10 };
+        selection.Children.Add(new TextBlock { Text = "自动发现服务器，或手动选择 PalServer.exe。管理器不会在此步骤修改游戏存档。", TextWrapping = TextWrapping.Wrap, Foreground = Brush("PalMutedTextBrush") });
+        selection.Children.Add(_servers);
         var detect = new Button { Content = "自动发现" };
         var browse = new Button { Content = "选择 PalServer.exe" };
         _registryButtons.Children.Add(detect); _registryButtons.Children.Add(_useDetected); _registryButtons.Children.Add(browse);
-        _panel.Children.Add(_registryButtons);
-        _panel.Children.Add(_candidates);
+        selection.Children.Add(_registryButtons);
+        selection.Children.Add(_candidates);
         _managementButtons.Children.Add(_continue); _managementButtons.Children.Add(_relocate); _managementButtons.Children.Add(_remove);
-        _panel.Children.Add(_managementButtons);
-        _panel.Children.Add(_divider);
-        _panel.Children.Add(new TextBlock { Text = "服务器与存档", FontSize = 20, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
-        _panel.Children.Add(_status);
-        _panel.Children.Add(_summary);
+        selection.Children.Add(_managementButtons);
+        _panel.Children.Add(Card(selection));
+        _panel.Children.Add(new TextBlock { Text = "服务器与存档", FontSize = 16, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+        var assessment = new StackPanel { Spacing = 10 };
+        assessment.Children.Add(_status);
+        _summary.Foreground = Brush("PalMutedTextBrush");
+        assessment.Children.Add(_summary);
         var stateButtons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
         stateButtons.Children.Add(_attach); stateButtons.Children.Add(_refresh);
-        _panel.Children.Add(stateButtons);
-        Content = new ScrollViewer { Content = _panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        assessment.Children.Add(stateButtons);
+        _panel.Children.Add(Card(assessment));
+        Content = new ScrollViewer { Content = _panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Background = Brush("PalBackgroundBrush") };
 
         Closed += (_, _) => _completion.TrySetResult(null);
         _servers.SelectionChanged += async (_, _) => await RunAsync(PersistSelectionAndAssessAsync);
@@ -153,6 +158,14 @@ public sealed class ServerSetupWindow : Window
 
     public Task<RegisteredServer?> ShowAsync() { Activate(); _ = RunAsync(RefreshAsync); return _completion.Task; }
     public void Dismiss() => Close();
+
+    private static Brush Brush(string key) => (Brush)Application.Current.Resources[key];
+
+    private static Border Card(UIElement content) => new()
+    {
+        Child = content,
+        Style = (Style)Application.Current.Resources["CardStyle"]
+    };
 
     private async Task RegisterAsync(string exe)
     {
