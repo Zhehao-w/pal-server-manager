@@ -13,8 +13,7 @@ public sealed class KeepAwakeService(PalContext context, ServerProcessService pr
         var nativePath = context.AppPaths.KeepAwakeExecutable;
         if (!File.Exists(nativePath))
             throw new FileNotFoundException("缺少原生防睡眠辅助程序 PalServer-KeepAwake.exe。", nativePath);
-        if (IsExactHelperRunning(nativePath)) return;
-        var preferredPid = server.ProcessIds.First();
+        var preferredPid = SelectServerPid(server);
         try
         {
             using var helper = Process.Start(new ProcessStartInfo(nativePath, $"--pid {preferredPid}")
@@ -31,24 +30,36 @@ public sealed class KeepAwakeService(PalContext context, ServerProcessService pr
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            await log.WriteAsync($"Native keep-awake helper could not start: {exception.Message}", cancellationToken);
+            await log.WriteAsync($"Native keep-awake helper could not start for PalServer PID {preferredPid}: {exception.Message}", cancellationToken);
             throw;
         }
     }
 
-    private static bool IsExactHelperRunning(string expectedPath)
+    private int SelectServerPid(ServerProcessSnapshot snapshot)
     {
-        foreach (var process in Process.GetProcessesByName("PalServer-KeepAwake"))
+        var preferredPaths = new[]
         {
-            using (process)
+            context.ServerPaths.ShippingExe,
+            context.ServerPaths.ShippingCmdExe,
+            context.ServerPaths.ServerExe
+        }.Select(Path.GetFullPath).ToArray();
+
+        foreach (var preferredPath in preferredPaths)
+        {
+            foreach (var pid in snapshot.ProcessIds)
             {
                 try
                 {
-                    if (string.Equals(Path.GetFullPath(process.MainModule!.FileName), Path.GetFullPath(expectedPath), StringComparison.OrdinalIgnoreCase)) return true;
+                    using var process = Process.GetProcessById(pid);
+                    var processPath = process.MainModule?.FileName;
+                    if (processPath is not null &&
+                        string.Equals(Path.GetFullPath(processPath), preferredPath, StringComparison.OrdinalIgnoreCase))
+                        return pid;
                 }
                 catch { }
             }
         }
-        return false;
+
+        return snapshot.ProcessIds.First();
     }
 }
