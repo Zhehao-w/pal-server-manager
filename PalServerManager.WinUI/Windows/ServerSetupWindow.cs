@@ -83,6 +83,10 @@ public sealed class ServerSetupWindow : Window
                 _lastRasterizationScale = scale;
                 ApplyResponsiveMinimum(appWindow, id);
             };
+            appWindow.Changed += (_, args) =>
+            {
+                if (args.DidPositionChange) ApplyResponsiveMinimum(appWindow, id);
+            };
         };
 
         Closed += (_, _) => _completion.TrySetResult(null);
