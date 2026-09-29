@@ -169,11 +169,13 @@ internal static class P1RegressionTests
             await gate.WaitAsync();
             try
             {
-                var read = Task.Run(() => roster.GetCurrentSnapshot(DateTimeOffset.UtcNow));
+                var renderedAt = started.AddMinutes(5);
+                var read = Task.Run(() => roster.GetCurrentSnapshot(renderedAt));
                 var winner = await Task.WhenAny(read, Task.Delay(TimeSpan.FromSeconds(1)));
                 True(ReferenceEquals(winner, read), "GetCurrentSnapshot blocked on the async refresh gate");
                 var snapshot = await read;
                 Equal(1, snapshot.OnlineCount);
+                Equal("5 分钟", snapshot.Players.Single().OnlineDuration);
             }
             finally
             {
