@@ -18,8 +18,9 @@ public sealed class PlayerRosterService(PalContext context, SafeFileService file
     private readonly Dictionary<string, DateTimeOffset> _sessionStarts = new(StringComparer.OrdinalIgnoreCase);
     private DateTimeOffset _nextSaveScanUtc = DateTimeOffset.MinValue;
     private DateTimeOffset _nextCheckpointUtc = DateTimeOffset.MinValue;
+    private PlayerRosterSnapshot _currentSnapshot = new([], 0, 0, false);
     private bool _dirty;
-    private bool _disposed;
+    private int _disposed;
 
     public async Task<PlayerRosterSnapshot> RefreshAsync(
         string worldGuid,
@@ -64,7 +65,9 @@ public sealed class PlayerRosterService(PalContext context, SafeFileService file
                 _nextCheckpointUtc = now.AddMinutes(5);
             }
 
-            return CreateSnapshot(now);
+            var snapshot = CreateSnapshot(now);
+            Volatile.Write(ref _currentSnapshot, snapshot);
+            return snapshot;
         }
         finally
         {
@@ -72,19 +75,10 @@ public sealed class PlayerRosterService(PalContext context, SafeFileService file
         }
     }
 
-    public PlayerRosterSnapshot GetCurrentSnapshot(DateTimeOffset now)
-    {
-        _gate.Wait();
-        try
-        {
-            ThrowIfDisposed();
-            return CreateSnapshot(now);
-        }
-        finally
-        {
-            _gate.Release();
-        }
-    }
+    // UI callers only need the last immutable snapshot. Never synchronously wait
+    // on the async refresh gate here: the refresh continuation may need the UI
+    // context that is asking for this snapshot.
+    public PlayerRosterSnapshot GetCurrentSnapshot(DateTimeOffset now) => Volatile.Read(ref _currentSnapshot);
 
     private async Task EnsureLoadedAsync(CancellationToken cancellationToken)
     {
@@ -295,13 +289,6 @@ public sealed class PlayerRosterService(PalContext context, SafeFileService file
         _dirty = false;
     }
 
-    private void SaveDocument()
-    {
-        if (!_dirty || _document is null) return;
-        files.WriteJsonAsync(context.StatePaths.PlayerActivityPath, _document, JsonOptions, keepPrevious: true).GetAwaiter().GetResult();
-        _dirty = false;
-    }
-
     private static string NormalizePlayerId(string? value)
     {
         var normalized = (value ?? "").Trim();
@@ -328,22 +315,14 @@ public sealed class PlayerRosterService(PalContext context, SafeFileService file
 
     private void ThrowIfDisposed()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
     }
 
     public void Dispose()
     {
-        _gate.Wait();
-        try
-        {
-            if (_disposed) return;
-            EndAllSessions(DateTimeOffset.Now);
-            try { SaveDocument(); } catch { }
-            _disposed = true;
-        }
-        finally
-        {
-            _gate.Release();
-        }
+        // Shutdown must never synchronously wait for an async refresh continuation.
+        // Important roster changes are checkpointed by RefreshAsync; disposal only
+        // prevents new refreshes and lets an in-flight refresh finish naturally.
+        Interlocked.Exchange(ref _disposed, 1);
     }
 }
