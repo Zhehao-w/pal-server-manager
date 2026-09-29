@@ -4,6 +4,10 @@ on:
   push:
   pull_request:
 
+permissions:
+  actions: write
+  contents: read
+
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -12,6 +16,28 @@ jobs:
   build-test-publish:
     runs-on: windows-latest
     steps:
+      - name: Cancel stale CI runs
+        if: github.event_name == 'push'
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          $headers = @{
+            Authorization = "Bearer $env:GITHUB_TOKEN"
+            Accept = "application/vnd.github+json"
+            "X-GitHub-Api-Version" = "2022-11-28"
+          }
+          $runIds = @(36608346825, 36608597315, 36608623395, 36608640200, 36608674164, 36608714845)
+          foreach ($runId in $runIds) {
+            $uri = "https://api.github.com/repos/${{ github.repository }}/actions/runs/$runId/cancel"
+            try {
+              Invoke-RestMethod -Method Post -Uri $uri -Headers $headers | Out-Null
+              Write-Host "Cancelled stale run $runId"
+            }
+            catch {
+              Write-Warning "Could not cancel stale run $runId`: $($_.Exception.Message)"
+            }
+          }
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
