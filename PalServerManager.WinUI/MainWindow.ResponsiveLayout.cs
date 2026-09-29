@@ -10,7 +10,7 @@ namespace HaoHaoTianTian.PalHR;
 
 public sealed partial class MainWindow
 {
-    private const double ConstrainedWindowHeight = 732;
+    private const double ConstrainedWindowHeight = 734;
     private const double ConstrainedDashboardHeight = 680;
     private Grid? _dashboardGrid;
     private ScrollViewer? _dashboardScroller;
