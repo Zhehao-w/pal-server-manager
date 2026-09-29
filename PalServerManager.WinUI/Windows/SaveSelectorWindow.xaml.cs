@@ -56,6 +56,7 @@ public sealed partial class SaveSelectorWindow : Window
         ViewModel.EditWorldSettingsAsync = session =>
             WorldSettingsEditorDialog.ShowAsync(RootGrid.XamlRoot, session, worldSettings, serverRunning: false, allowRestart: false);
         ViewModel.Completed += (_, choice) => Complete(choice);
+        _appWindow.Closing += SaveSelectorWindow_Closing;
         Activated += SaveSelectorWindow_Activated;
         Closed += (_, _) =>
         {
@@ -73,6 +74,13 @@ public sealed partial class SaveSelectorWindow : Window
     {
         if (!_completed) _completed = true;
         Close();
+    }
+
+    private void SaveSelectorWindow_Closing(AppWindow sender, AppWindowClosingEventArgs args)
+    {
+        if (!ViewModel.IsBusy) return;
+        args.Cancel = true;
+        ViewModel.Feedback = "存档操作正在进行，请等待完成后再关闭窗口。";
     }
 
     private async void SaveSelectorWindow_Activated(object sender, WindowActivatedEventArgs args)
@@ -227,7 +235,8 @@ public sealed partial class SaveSelectorWindow : Window
             try
             {
                 var tag = candidates.Count == 1 ? request.Value.SingleTag! : DefaultImportTag(candidate);
-                imported.Add(await _importer.ImportAsync(candidate.FolderPath, candidate.WorldUid!, tag, request.Value.Source));
+                imported.Add(await Task.Run(() =>
+                    _importer.ImportAsync(candidate.FolderPath, candidate.WorldUid!, tag, request.Value.Source)));
             }
             catch (Exception error)
             {
