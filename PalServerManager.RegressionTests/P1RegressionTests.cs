@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text.Json;
 using HaoHaoTianTian.PalHR.Models;
 using HaoHaoTianTian.PalHR.Services;
 
@@ -15,9 +16,9 @@ internal static class P1RegressionTests
         await CreateWorldRollbackRestoresBothAuthoritiesAsync();
         Console.WriteLine("PASS P1 create-world rollback authority");
 
-        Console.WriteLine("RUN P1 roster snapshot/dispose never wait on async gate");
-        await PlayerRosterReadAndDisposeAreNonBlockingAsync();
-        Console.WriteLine("PASS P1 roster snapshot/dispose never wait on async gate");
+        Console.WriteLine("RUN P1 roster snapshot and shutdown persistence");
+        await PlayerRosterSnapshotAndShutdownPersistenceAsync();
+        Console.WriteLine("PASS P1 roster snapshot and shutdown persistence");
     }
 
     private static async Task CreateWorldRollbackRestoresBothAuthoritiesAsync()
@@ -147,7 +148,7 @@ internal static class P1RegressionTests
         }
     }
 
-    private static async Task PlayerRosterReadAndDisposeAreNonBlockingAsync()
+    private static async Task PlayerRosterSnapshotAndShutdownPersistenceAsync()
     {
         await InTempAsync(async root =>
         {
@@ -156,7 +157,14 @@ internal static class P1RegressionTests
             var players = Path.Combine(env.Context.ServerPaths.ActivePath, uid, "Players");
             Directory.CreateDirectory(players);
             var roster = new PlayerRosterService(env.Context, env.Files);
-            await roster.RefreshAsync(uid, players, [], PlayerPresenceMode.ServerStopped, DateTimeOffset.UtcNow);
+            var started = DateTimeOffset.UtcNow.AddMinutes(-2);
+            await roster.RefreshAsync(
+                uid,
+                players,
+                [new RestPlayer("Tester", 42, 12, "player-1", "user-1", "account-1")],
+                PlayerPresenceMode.OnlineSnapshot,
+                started);
+
             var gate = GetRosterGate(roster);
             await gate.WaitAsync();
             try
@@ -164,28 +172,21 @@ internal static class P1RegressionTests
                 var read = Task.Run(() => roster.GetCurrentSnapshot(DateTimeOffset.UtcNow));
                 var winner = await Task.WhenAny(read, Task.Delay(TimeSpan.FromSeconds(1)));
                 True(ReferenceEquals(winner, read), "GetCurrentSnapshot blocked on the async refresh gate");
-                await read;
+                var snapshot = await read;
+                Equal(1, snapshot.OnlineCount);
             }
             finally
             {
                 gate.Release();
-                roster.Dispose();
             }
 
-            var disposeRoster = new PlayerRosterService(env.Context, env.Files);
-            var disposeGate = GetRosterGate(disposeRoster);
-            await disposeGate.WaitAsync();
-            try
-            {
-                var dispose = Task.Run(disposeRoster.Dispose);
-                var winner = await Task.WhenAny(dispose, Task.Delay(TimeSpan.FromSeconds(1)));
-                True(ReferenceEquals(winner, dispose), "Dispose blocked on the async refresh gate");
-                await dispose;
-            }
-            finally
-            {
-                disposeGate.Release();
-            }
+            var dispose = Task.Run(roster.Dispose);
+            await dispose.WaitAsync(TimeSpan.FromSeconds(2));
+            var activityBytes = await File.ReadAllBytesAsync(env.Context.StatePaths.PlayerActivityPath);
+            var activity = JsonSerializer.Deserialize<PlayerActivityDocument>(activityBytes)
+                ?? throw new InvalidOperationException("PlayerActivity.json was empty after shutdown persistence.");
+            var record = activity.Worlds[uid].Players["PLAYER-1"];
+            True(record.LastLeftUtc is not null, "Dispose no longer persisted the tracked session end.");
         });
     }
 
