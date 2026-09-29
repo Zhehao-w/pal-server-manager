@@ -65,12 +65,12 @@ public sealed partial class MainWindow : Window
     private static void ConfigureTitleBar(AppWindowTitleBar titleBar)
     {
         titleBar.ButtonForegroundColor = Colors.White;
-        titleBar.ButtonInactiveForegroundColor = global::Windows.UI.Color.FromArgb(150, 242, 247, 248);
+        titleBar.ButtonInactiveForegroundColor = global::Windows.UI.Color.FromArgb(150, 245, 245, 247);
         titleBar.ButtonBackgroundColor = Colors.Transparent;
         titleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
-        titleBar.ButtonHoverBackgroundColor = global::Windows.UI.Color.FromArgb(42, 255, 255, 255);
+        titleBar.ButtonHoverBackgroundColor = global::Windows.UI.Color.FromArgb(32, 255, 255, 255);
         titleBar.ButtonHoverForegroundColor = Colors.White;
-        titleBar.ButtonPressedBackgroundColor = global::Windows.UI.Color.FromArgb(70, 255, 255, 255);
+        titleBar.ButtonPressedBackgroundColor = global::Windows.UI.Color.FromArgb(52, 255, 255, 255);
         titleBar.ButtonPressedForegroundColor = Colors.White;
     }
 
@@ -105,7 +105,7 @@ public sealed partial class MainWindow : Window
         {
             XamlRoot = RootGrid.XamlRoot,
             Title = title,
-            Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap, MaxWidth = 520 },
+            Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap, MaxWidth = 520, Foreground = Brush("PalTextBrush") },
             PrimaryButtonText = "继续",
             CloseButtonText = "取消",
             DefaultButton = ContentDialogButton.Close
@@ -121,7 +121,13 @@ public sealed partial class MainWindow : Window
             {
                 XamlRoot = RootGrid.XamlRoot,
                 Title = "没有可用备份",
-                Content = "当前存档没有找到完整的游戏自动备份或回档前保护副本。",
+                Content = new TextBlock
+                {
+                    Text = "当前存档没有找到完整的游戏自动备份或回档前保护副本。",
+                    TextWrapping = TextWrapping.Wrap,
+                    MaxWidth = 520,
+                    Foreground = Brush("PalMutedTextBrush")
+                },
                 CloseButtonText = "知道了"
             };
             await empty.ShowAsync();
@@ -135,15 +141,15 @@ public sealed partial class MainWindow : Window
             SelectionMode = ListViewSelectionMode.Single,
             SelectedIndex = 0,
             MinWidth = 600,
-            MaxHeight = 360
+            MaxHeight = 340
         };
         var explanation = serverRunning
             ? "服务器正在运行：确认后会先保存并正常关服，恢复所选版本，再自动启动同一存档。"
             : "服务器已关闭：确认后直接覆盖当前存档；游戏自动备份与 WorldOption 设置会保留。";
-        var content = new StackPanel { Spacing = 12 };
-        content.Children.Add(new TextBlock { Text = explanation, TextWrapping = TextWrapping.Wrap });
-        content.Children.Add(list);
-        content.Children.Add(new TextBlock { Text = "默认仅恢复世界存档数据；当前世界设置不会随回档改变。回档前会自动创建保护快照。", Opacity = 0.78, FontSize = 12, TextWrapping = TextWrapping.Wrap });
+        var content = new StackPanel { Spacing = 10 };
+        content.Children.Add(new TextBlock { Text = explanation, TextWrapping = TextWrapping.Wrap, Foreground = Brush("PalMutedTextBrush"), FontSize = 11 });
+        content.Children.Add(new Border { Style = Style("GroupedSurfaceStyle"), Child = list });
+        content.Children.Add(new TextBlock { Text = "默认仅恢复世界存档数据；当前世界设置不会随回档改变。回档前会自动创建保护快照。", Foreground = Brush("PalMutedTextBrush"), FontSize = 11, TextWrapping = TextWrapping.Wrap });
         var restoreSettings = new CheckBox { Content = "同时恢复此快照记录的世界设置", IsEnabled = (list.SelectedItem as BackupEntry)?.HasManagerManifest == true };
         list.SelectionChanged += (_, _) =>
         {
@@ -167,10 +173,11 @@ public sealed partial class MainWindow : Window
 
     private async Task<WorldOptionDecision> ShowWorldOptionConflictAsync(WorldOptionConflict conflict)
     {
-        var folder = new Button { Content = "打开所在文件夹", HorizontalAlignment = HorizontalAlignment.Left };
+        var folder = new Button { Content = "打开所在文件夹", HorizontalAlignment = HorizontalAlignment.Left, Style = Style("CompactPalButtonStyle") };
         folder.Click += (_, _) => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"/select,\"{conflict.FilePath}\"") { UseShellExecute = true })?.Dispose();
-        var panel = new StackPanel { Spacing = 12 };
+        var panel = new StackPanel { Spacing = 10 };
         panel.Children.Add(new TextBlock { Text = $"检测到 {System.IO.Path.GetFileName(conflict.FilePath)}。它可能覆盖 PalWorldSettings.ini，使游戏实际设置与管理器中保存的设置不同。", TextWrapping = TextWrapping.Wrap, MaxWidth = 560 });
+        panel.Children.Add(new TextBlock { Text = "原文件可以可逆地备份并停用；管理器不会直接删除它。", Foreground = Brush("PalMutedTextBrush"), FontSize = 11, TextWrapping = TextWrapping.Wrap });
         panel.Children.Add(folder);
         var dialog = new ContentDialog { XamlRoot = RootGrid.XamlRoot, Title = "检测到世界本地设置文件", Content = panel, PrimaryButtonText = "备份并停用后启动", CloseButtonText = "取消启动", DefaultButton = ContentDialogButton.Close };
         var result = await dialog.ShowAsync();
@@ -180,11 +187,20 @@ public sealed partial class MainWindow : Window
 
     private async Task<UpdateProtectionDecision> ShowUpdateProtectionAsync(SaveSlot slot, string build)
     {
+        var body = new StackPanel { Spacing = 10 };
+        body.Children.Add(new TextBlock { Text = $"存档 {slot.Id} · {slot.Tag} 尚未在当前 Palworld Dedicated Server 版本下成功启动。", TextWrapping = TextWrapping.Wrap });
+        body.Children.Add(new TextBlock { Text = "建议在首次启动前创建完整保护快照（包括维度帕鲁终端数据）。", Foreground = Brush("PalMutedTextBrush"), FontSize = 11, TextWrapping = TextWrapping.Wrap });
+        body.Children.Add(new Border
+        {
+            Style = Style("GroupedSurfaceStyle"),
+            Padding = new Thickness(12, 8),
+            Child = new TextBlock { Text = $"版本标识  {build}", FontFamily = new FontFamily("Cascadia Mono, Consolas"), FontSize = 11, TextTrimming = TextTrimming.CharacterEllipsis }
+        });
         var dialog = new ContentDialog
         {
             XamlRoot = RootGrid.XamlRoot,
             Title = "检测到新的服务器版本",
-            Content = new TextBlock { Text = $"存档 {slot.Id} · {slot.Tag} 尚未在当前 Palworld Dedicated Server 版本下成功启动。\n\n建议在首次启动前创建完整保护快照（包括维度帕鲁终端数据）。\n版本标识：{build}", TextWrapping = TextWrapping.Wrap, MaxWidth = 580 },
+            Content = body,
             PrimaryButtonText = "创建快照并启动",
             SecondaryButtonText = "仅启动",
             CloseButtonText = "取消",
@@ -209,4 +225,7 @@ public sealed partial class MainWindow : Window
 
     private static double NormalizeIdleMinutes(double value) =>
         Math.Clamp(double.IsFinite(value) ? Math.Round(value) : 15, 2, 1439);
+
+    private static Brush Brush(string key) => (Brush)Application.Current.Resources[key];
+    private static Style Style(string key) => (Style)Application.Current.Resources[key];
 }
