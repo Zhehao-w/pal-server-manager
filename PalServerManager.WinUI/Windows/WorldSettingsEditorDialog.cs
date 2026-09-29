@@ -33,11 +33,11 @@ public static class WorldSettingsEditorDialog
             FontSize = 12
         };
 
-        var body = new StackPanel { Spacing = 12 };
+        var body = new StackPanel { Spacing = 16 };
         body.Children.Add(new TextBlock
         {
             Text = existingWorldImport ? "导入现有存档 · 自定义世界设置" : session.IsDraft ? "新存档 · 自定义世界设置" : $"存档 {session.SlotId} · {session.Tag}",
-            FontSize = 20,
+            FontSize = 22,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
         });
         body.Children.Add(new TextBlock
@@ -59,7 +59,7 @@ public static class WorldSettingsEditorDialog
             body.Children.Add(BuildCategory("服务器（全局共享）", WorldSettingsService.GlobalDefinitions, globals, controls,
                 "这些值由所有存档共享；管理器不会把它们写入任何存档 profile。AdminPassword、REST、端口和 RCON 不在此处管理。"));
 
-        var utility = new Grid { ColumnSpacing = 8 };
+        var utility = new Grid { ColumnSpacing = 8, Margin = new Thickness(0, 2, 0, 0) };
         utility.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         utility.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         utility.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -96,8 +96,9 @@ public static class WorldSettingsEditorDialog
         var scroll = new ScrollViewer
         {
             Content = body,
-            MaxWidth = 820,
+            MaxWidth = 840,
             MaxHeight = 640,
+            Padding = new Thickness(2, 0, 8, 0),
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
         };
@@ -109,7 +110,7 @@ public static class WorldSettingsEditorDialog
             PrimaryButtonText = session.IsDraft ? "采用此设置" : "保存设置",
             CloseButtonText = "取消",
             DefaultButton = ContentDialogButton.Primary,
-            MinWidth = 720
+            MinWidth = 700
         };
         if (allowRestart && serverRunning)
         {
@@ -137,32 +138,45 @@ public static class WorldSettingsEditorDialog
         return outcome is ContentDialogResult.Primary or ContentDialogResult.Secondary ? result : null;
     }
 
-    private static Expander BuildCategory(
+    private static StackPanel BuildCategory(
         string title,
         IReadOnlyList<WorldSettingDefinition> definitions,
         IReadOnlyDictionary<string, string> values,
         IDictionary<string, Control> controls,
         string? note = null)
     {
-        var panel = new StackPanel { Spacing = 0, Padding = new Thickness(8, 4, 8, 8) };
+        var section = new StackPanel { Spacing = 7 };
+        section.Children.Add(new TextBlock
+        {
+            Text = title,
+            FontSize = 13,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = Brush("PalMutedTextBrush"),
+            Margin = new Thickness(8, 0, 0, 0)
+        });
+
+        var rows = new StackPanel { Spacing = 0 };
         if (!string.IsNullOrWhiteSpace(note))
         {
-            panel.Children.Add(new TextBlock
+            rows.Children.Add(new TextBlock
             {
                 Text = note,
                 Foreground = Brush("PalMutedTextBrush"),
                 FontSize = 11,
                 TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(4, 4, 4, 8)
+                Margin = new Thickness(16, 12, 16, 10)
             });
+            rows.Children.Add(new Border { Height = 1, Background = Brush("PalBorderBrush"), Opacity = 0.45 });
         }
-        foreach (var definition in definitions)
+
+        for (var index = 0; index < definitions.Count; index++)
         {
-            var row = new Grid { MinHeight = 64, ColumnSpacing = 18, Padding = new Thickness(8, 6, 8, 6) };
+            var definition = definitions[index];
+            var row = new Grid { MinHeight = 62, ColumnSpacing = 18, Padding = new Thickness(16, 8, 14, 8) };
             ToolTipService.SetToolTip(row, $"INI: {definition.Key}\n{definition.Description}");
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(240) });
-            var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(236) });
+            var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Spacing = 2 };
             text.Children.Add(new TextBlock { Text = definition.Label, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
             text.Children.Add(new TextBlock { Text = definition.Description, Foreground = Brush("PalMutedTextBrush"), FontSize = 11, TextWrapping = TextWrapping.Wrap });
             var control = CreateControl(definition, values.TryGetValue(definition.Key, out var value) ? value : "");
@@ -170,18 +184,21 @@ public static class WorldSettingsEditorDialog
             Grid.SetColumn(control, 1);
             row.Children.Add(text);
             row.Children.Add(control);
-            panel.Children.Add(row);
-            if (!ReferenceEquals(definition, definitions[^1]))
-                panel.Children.Add(new Border { Height = 1, Background = Brush("PalBorderBrush"), Margin = new Thickness(8, 0, 8, 0), Opacity = 0.55 });
+            rows.Children.Add(row);
+            if (index < definitions.Count - 1)
+                rows.Children.Add(new Border { Height = 1, Background = Brush("PalBorderBrush"), Margin = new Thickness(16, 0, 14, 0), Opacity = 0.45 });
             controls[definition.Key] = control;
         }
-        return new Expander
+
+        section.Children.Add(new Border
         {
-            Header = title,
-            Content = panel,
-            IsExpanded = title.StartsWith("世界", StringComparison.Ordinal) || title.StartsWith("服务器", StringComparison.Ordinal),
-            HorizontalAlignment = HorizontalAlignment.Stretch
-        };
+            Background = Brush("PalCardAltBrush"),
+            BorderBrush = Brush("PalBorderBrush"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(12),
+            Child = rows
+        });
+        return section;
     }
 
     private static Control CreateControl(WorldSettingDefinition definition, string raw)
