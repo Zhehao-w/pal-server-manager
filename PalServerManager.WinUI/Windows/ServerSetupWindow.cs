@@ -34,6 +34,8 @@ public sealed class ServerSetupWindow : Window
     private ServerRegistryDocument _document = new();
     private string? _pendingRoot;
     private bool _busy;
+    private bool _dpiWatcherAttached;
+    private double _lastRasterizationScale;
 
     public ServerSetupWindow(ServerRegistryService registry, ServerStateService serverState, FirstRunServerSetupService firstRunSetup)
     {
@@ -44,13 +46,8 @@ public sealed class ServerSetupWindow : Window
         SystemBackdrop = new MicaBackdrop();
         var id = Win32Interop.GetWindowIdFromWindow(WindowNative.GetWindowHandle(this));
         var appWindow = AppWindow.GetFromWindowId(id);
-        var workArea = DisplayArea.GetFromWindowId(id, DisplayAreaFallback.Primary).WorkArea;
         Services.WindowPlacement.CenterOnPrimaryDisplay(appWindow, id, 760, 650);
-        if (appWindow.Presenter is OverlappedPresenter presenter)
-        {
-            presenter.PreferredMinimumWidth = Math.Min(Services.WindowPlacement.EffectivePixelsToPhysical(id, 700), workArea.Width);
-            presenter.PreferredMinimumHeight = Math.Min(Services.WindowPlacement.EffectivePixelsToPhysical(id, 590), workArea.Height);
-        }
+        ApplyResponsiveMinimum(appWindow, id);
 
         _panel.Children.Add(new TextBlock { Text = App.ProductName, FontSize = 13, Foreground = Brush("PalMutedTextBrush") });
         _panel.Children.Add(new TextBlock { Text = "连接 PalServer", FontSize = 28, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
@@ -70,7 +67,23 @@ public sealed class ServerSetupWindow : Window
         var stateButtons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
         stateButtons.Children.Add(_attach); stateButtons.Children.Add(_refresh);
         _panel.Children.Add(stateButtons);
-        Content = new ScrollViewer { Content = _panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        var rootScroller = new ScrollViewer { Content = _panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        Content = rootScroller;
+        rootScroller.Loaded += (_, _) =>
+        {
+            if (_dpiWatcherAttached) return;
+            _dpiWatcherAttached = true;
+            var xamlRoot = rootScroller.XamlRoot;
+            _lastRasterizationScale = xamlRoot.RasterizationScale;
+            ApplyResponsiveMinimum(appWindow, id);
+            xamlRoot.Changed += (_, _) =>
+            {
+                var scale = xamlRoot.RasterizationScale;
+                if (Math.Abs(scale - _lastRasterizationScale) < 0.001) return;
+                _lastRasterizationScale = scale;
+                ApplyResponsiveMinimum(appWindow, id);
+            };
+        };
 
         Closed += (_, _) => _completion.TrySetResult(null);
         _servers.SelectionChanged += async (_, _) => await RunAsync(PersistSelectionAndAssessAsync);
@@ -158,6 +171,14 @@ public sealed class ServerSetupWindow : Window
 
     private static Brush Brush(string key) => (Brush)Application.Current.Resources[key];
     private static Style Style(string key) => (Style)Application.Current.Resources[key];
+
+    private static void ApplyResponsiveMinimum(AppWindow appWindow, WindowId windowId)
+    {
+        var workArea = DisplayArea.GetFromWindowId(windowId, DisplayAreaFallback.Primary).WorkArea;
+        if (appWindow.Presenter is not OverlappedPresenter presenter) return;
+        presenter.PreferredMinimumWidth = Math.Min(Services.WindowPlacement.EffectivePixelsToPhysical(windowId, 700), workArea.Width);
+        presenter.PreferredMinimumHeight = Math.Min(Services.WindowPlacement.EffectivePixelsToPhysical(windowId, 590), workArea.Height);
+    }
 
     private async Task RegisterAsync(string exe)
     {
