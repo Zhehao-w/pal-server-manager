@@ -449,30 +449,8 @@ public sealed class WorldSettingsService(PalContext context, LoggingService log,
         }
     }
 
-
-    public static void ValidateProfileValues(IReadOnlyDictionary<string, string> values)
-    {
-        foreach (var definition in ProfileDefinitions)
-        {
-            if (!values.TryGetValue(definition.Key, out var raw))
-                throw new InvalidOperationException($"profile 缺少 {definition.Key}。 ");
-            switch (definition.Kind)
-            {
-                case WorldSettingKind.Boolean when !bool.TryParse(raw, out _):
-                    throw new InvalidOperationException($"{definition.Key} 不是有效的 True/False。 ");
-                case WorldSettingKind.Number:
-                    if (!double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var number) || !double.IsFinite(number))
-                        throw new InvalidOperationException($"{definition.Key} 不是有效数值。 ");
-                    break;
-                case WorldSettingKind.Integer:
-                    if (!double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var integer) || !double.IsFinite(integer) || integer != Math.Truncate(integer))
-                        throw new InvalidOperationException($"{definition.Key} 不是有效整数。 ");
-                    break;
-                case WorldSettingKind.Choice when definition.Choices is null || !definition.Choices.Contains(raw, StringComparer.OrdinalIgnoreCase):
-                    throw new InvalidOperationException($"{definition.Key} 的枚举值无效。 ");
-            }
-        }
-    }
+    public static void ValidateProfileValues(IReadOnlyDictionary<string, string> values) =>
+        WorldSettingsValueValidator.ValidateProfile(values);
 
     private Task WriteProfileAtomicAsync(string path, WorldSettingsProfile profile, CancellationToken cancellationToken, bool overwrite)
     {
