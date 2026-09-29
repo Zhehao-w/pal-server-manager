@@ -42,6 +42,7 @@ public sealed class ServerStateService(AppPaths app, SafeFileService files)
 
         try { await ValidateStateAsync(root, server, cancellationToken); }
         catch (Exception error) { return new(ServerStateKind.InvalidState, $"管理状态无效：{error.Message}", server); }
+        CleanupPreservedAttachStateBestEffort(root);
         return new(ServerStateKind.Ready, "管理状态已验证。", server);
     }
 
@@ -76,6 +77,7 @@ public sealed class ServerStateService(AppPaths app, SafeFileService files)
         var stage = Path.Combine(app.ServersStateRoot, $".setup-{server.Id}-{Guid.NewGuid():N}");
         Directory.CreateDirectory(stage);
         string? preserved = null;
+        var activated = false;
         try
         {
             await files.WriteJsonAsync(Path.Combine(stage, "SaveSlots.json"), registry, cancellationToken: cancellationToken);
@@ -113,12 +115,20 @@ public sealed class ServerStateService(AppPaths app, SafeFileService files)
                 }
                 else Directory.Delete(root);
             }
-            try { Directory.Move(stage, root); }
+            try
+            {
+                Directory.Move(stage, root);
+                activated = true;
+                await ValidateStateAsync(root, server, cancellationToken);
+            }
             catch
             {
-                if (preserved is not null && !Directory.Exists(root)) Directory.Move(preserved, root);
+                if (activated && Directory.Exists(root)) Directory.Delete(root, recursive: true);
+                if (preserved is not null && Directory.Exists(preserved) && !Directory.Exists(root))
+                    Directory.Move(preserved, root);
                 throw;
             }
+            CleanupPreservedAttachStateBestEffort(root);
         }
         catch
         {
@@ -131,6 +141,19 @@ public sealed class ServerStateService(AppPaths app, SafeFileService files)
     private bool HasStagingDirectory(RegisteredServer server) =>
         Directory.Exists(app.ServersStateRoot) &&
         Directory.EnumerateDirectories(app.ServersStateRoot, $".*-{server.Id}-*").Any();
+
+    private static void CleanupPreservedAttachStateBestEffort(string root)
+    {
+        var parent = Path.GetDirectoryName(root);
+        if (parent is null || !Directory.Exists(parent)) return;
+        var prefix = Path.GetFileName(root) + ".empty-before-attach-";
+        foreach (var path in Directory.EnumerateDirectories(parent)
+                     .Where(path => Path.GetFileName(path).StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
+        {
+            try { Directory.Delete(path, recursive: true); }
+            catch { }
+        }
+    }
 
     private static SaveSlotRegistry BuildRegistry(DiscoveredWorld active, string saveRoot)
     {
@@ -168,6 +191,7 @@ public sealed class ServerStateService(AppPaths app, SafeFileService files)
                 throw new InvalidOperationException($"存档 {slot.Id} 的世界设置身份无效。");
             if (profile.SchemaVersion == WorldSettingsService.CurrentProfileSchema)
             {
+                WorldSettingsValueValidator.ValidateProfile(profile.Values);
                 var staged = new PalContext(AppPaths.ForExplicitRoots(root, root),
                     new ServerPaths(server.ServerRoot), new ServerStatePaths(root));
                 var worldSettings = new WorldSettingsService(staged, new LoggingService(staged), new SafeFileService());

@@ -68,12 +68,15 @@ public sealed partial class SaveSlotService(PalContext context, ServerProcessSer
         var newParked = NewParkedFolderName(slotId, newTag);
         var oldPath = PathSafety.RequireInside(context.ServerPaths.SaveRoot, Path.Combine(context.ServerPaths.SaveRoot, oldParked));
         var newPath = PathSafety.RequireInside(context.ServerPaths.SaveRoot, Path.Combine(context.ServerPaths.SaveRoot, newParked));
+        var parkedNameChanged = !string.Equals(oldPath, newPath, StringComparison.OrdinalIgnoreCase);
         var moved = false;
 
-        if (slotId != registry.ActiveSlotId && !string.Equals(oldPath, newPath, StringComparison.OrdinalIgnoreCase))
+        if (parkedNameChanged && (Directory.Exists(newPath) || File.Exists(newPath)))
+            throw new IOException($"新标签与已有文件夹冲突：{newPath}");
+
+        if (slotId != registry.ActiveSlotId && parkedNameChanged)
         {
             if (!Directory.Exists(oldPath)) throw new DirectoryNotFoundException($"找不到停放存档：{oldPath}");
-            if (Directory.Exists(newPath) || File.Exists(newPath)) throw new IOException($"新标签与已有文件夹冲突：{newPath}");
             await Task.Run(() => Directory.Move(oldPath, newPath), cancellationToken);
             moved = true;
         }

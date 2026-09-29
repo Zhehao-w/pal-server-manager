@@ -30,6 +30,7 @@ public sealed class ServerSetupWindow : Window
     private readonly StackPanel _registryButtons = new() { Orientation = Orientation.Horizontal, Spacing = 8 };
     private readonly StackPanel _managementButtons = new() { Orientation = Orientation.Horizontal, Spacing = 8 };
     private readonly Button _useDetected = new() { Content = "使用此服务器", Style = Style("CompactPalButtonStyle") };
+    private readonly AppWindow _appWindow;
     private ServerRegistryDocument _document = new();
     private string? _pendingRoot;
     private bool _busy;
@@ -45,10 +46,10 @@ public sealed class ServerSetupWindow : Window
         SystemBackdrop = new MicaBackdrop();
         ExtendsContentIntoTitleBar = true;
         var id = Win32Interop.GetWindowIdFromWindow(WindowNative.GetWindowHandle(this));
-        var appWindow = AppWindow.GetFromWindowId(id);
-        ConfigureTitleBar(appWindow.TitleBar);
-        Services.WindowPlacement.CenterOnPrimaryDisplay(appWindow, id, 760, 650);
-        ApplyResponsiveMinimum(appWindow, id);
+        _appWindow = AppWindow.GetFromWindowId(id);
+        ConfigureTitleBar(_appWindow.TitleBar);
+        Services.WindowPlacement.CenterOnPrimaryDisplay(_appWindow, id, 760, 650);
+        ApplyResponsiveMinimum(_appWindow, id);
 
         var root = new Grid { Background = Brush("PalWindowTintBrush") };
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(54) });
@@ -117,20 +118,21 @@ public sealed class ServerSetupWindow : Window
             _dpiWatcherAttached = true;
             var xamlRoot = rootScroller.XamlRoot;
             _lastRasterizationScale = xamlRoot.RasterizationScale;
-            ApplyResponsiveMinimum(appWindow, id);
+            ApplyResponsiveMinimum(_appWindow, id);
             xamlRoot.Changed += (_, _) =>
             {
                 var scale = xamlRoot.RasterizationScale;
                 if (Math.Abs(scale - _lastRasterizationScale) < 0.001) return;
                 _lastRasterizationScale = scale;
-                ApplyResponsiveMinimum(appWindow, id);
+                ApplyResponsiveMinimum(_appWindow, id);
             };
-            appWindow.Changed += (_, args) =>
+            _appWindow.Changed += (_, args) =>
             {
-                if (args.DidPositionChange) ApplyResponsiveMinimum(appWindow, id);
+                if (args.DidPositionChange) ApplyResponsiveMinimum(_appWindow, id);
             };
         };
 
+        _appWindow.Closing += ServerSetupWindow_Closing;
         Closed += (_, _) => _completion.TrySetResult(null);
         _servers.SelectionChanged += async (_, _) => await RunAsync(PersistSelectionAndAssessAsync);
         _candidates.SelectionChanged += async (_, _) => await RunAsync(SelectCandidateAsync);
@@ -186,7 +188,7 @@ public sealed class ServerSetupWindow : Window
         _continue.Click += (_, _) =>
         {
             var selected = SelectedServer();
-            if (selected is not null) _completion.TrySetResult(selected);
+            if (!_busy && selected is not null) _completion.TrySetResult(selected);
         };
         _refresh.Click += async (_, _) => await RunAsync(AssessSelectedAsync);
         _attach.Click += async (_, _) => await RunAsync(async () =>
@@ -214,6 +216,13 @@ public sealed class ServerSetupWindow : Window
 
     public Task<RegisteredServer?> ShowAsync() { Activate(); _ = RunAsync(RefreshAsync); return _completion.Task; }
     public void Dismiss() => Close();
+
+    private void ServerSetupWindow_Closing(AppWindow sender, AppWindowClosingEventArgs args)
+    {
+        if (!_busy) return;
+        args.Cancel = true;
+        _status.Text = "当前服务器设置操作尚未完成，请等待完成后再关闭窗口。";
+    }
 
     private static Brush Brush(string key) => (Brush)Application.Current.Resources[key];
     private static Style Style(string key) => (Style)Application.Current.Resources[key];
@@ -396,8 +405,13 @@ public sealed class ServerSetupWindow : Window
     {
         if (_busy) return;
         _busy = true;
+        _panel.IsHitTestVisible = false;
         try { await action(); }
         catch (Exception error) { _status.Text = "操作未完成：" + error.Message; }
-        finally { _busy = false; }
+        finally
+        {
+            _panel.IsHitTestVisible = true;
+            _busy = false;
+        }
     }
 }
