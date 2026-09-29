@@ -6,13 +6,17 @@
 
   <Grid x:Name="RootGrid" Background="Transparent" Loaded="RootGrid_Loaded">
     <Grid.RowDefinitions>
-      <RowDefinition Height="54" />
+      <RowDefinition Height="48" />
       <RowDefinition Height="*" />
     </Grid.RowDefinitions>
 
-    <Grid Grid.Row="0" Background="#521C1C1E" Padding="18,0,144,0" ColumnSpacing="12">
-      <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-      <Grid x:Name="TitleBarDragRegion" VerticalAlignment="Stretch" ColumnSpacing="10">
+    <Grid x:Name="AppTitleBar" Grid.Row="0" Background="{StaticResource PalTitleBarBrush}" Padding="18,0,0,0" ColumnSpacing="8" Loaded="AppTitleBar_Loaded" SizeChanged="AppTitleBar_SizeChanged">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition x:Name="TitleBarRightInsetColumn" Width="0" />
+      </Grid.ColumnDefinitions>
+      <Grid x:Name="TitleBarDragRegion" Grid.Column="0" VerticalAlignment="Stretch" ColumnSpacing="10">
         <Grid.ColumnDefinitions><ColumnDefinition Width="28" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
         <Image Source="Assets/ManagerIconCircular.png" Width="24" Height="24" VerticalAlignment="Center" />
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
@@ -21,7 +25,7 @@
           <TextBlock x:Name="VersionRunHost" FontSize="11" Foreground="{StaticResource PalMutedTextBrush}" VerticalAlignment="Center"><Run x:Name="VersionRun" /></TextBlock>
         </StackPanel>
       </Grid>
-      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="0,0,8,0">
         <TextBlock Text="{x:Bind ViewModel.UpdatedAt, Mode=OneWay}" Foreground="{StaticResource PalMutedTextBrush}" FontSize="11" VerticalAlignment="Center" />
         <Button Command="{x:Bind ViewModel.RefreshCommand}" Style="{StaticResource IconPalButtonStyle}" ToolTipService.ToolTip="立即刷新服务器状态" AutomationProperties.Name="立即刷新服务器状态">
           <FontIcon Glyph="&#xE72C;" FontFamily="Segoe Fluent Icons" FontSize="14" />
@@ -85,7 +89,7 @@
             </StackPanel>
             <TextBlock Text="在线状态每 10 秒刷新" Foreground="{StaticResource PalMutedTextBrush}" FontSize="11" HorizontalAlignment="Right" VerticalAlignment="Center" />
           </Grid>
-          <Grid Grid.Row="1" Background="#562C2C2E" Padding="14,0,28,0" ColumnSpacing="12">
+          <Grid Grid.Row="1" Background="{StaticResource PalTableHeaderBrush}" Padding="14,0,28,0" ColumnSpacing="12">
             <Grid.ColumnDefinitions><ColumnDefinition Width="58" /><ColumnDefinition Width="1.1*" MinWidth="100" /><ColumnDefinition Width="48" /><ColumnDefinition Width="68" /><ColumnDefinition Width="90" /><ColumnDefinition Width="1.1*" MinWidth="118" /><ColumnDefinition Width="*" MinWidth="110" /></Grid.ColumnDefinitions>
             <TextBlock Text="状态" Style="{StaticResource TableHeaderTextStyle}" />
             <TextBlock Grid.Column="1" Text="玩家" Style="{StaticResource TableHeaderTextStyle}" />
@@ -97,8 +101,8 @@
           </Grid>
           <ListView Grid.Row="2" ItemsSource="{x:Bind ViewModel.Players}" SelectionMode="None" IsItemClickEnabled="False" ItemContainerStyle="{StaticResource ReadOnlyRosterItemStyle}" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
             <ListView.Resources>
-              <SolidColorBrush x:Key="ListViewItemBackgroundPointerOver" Color="#0AFFFFFF" />
-              <SolidColorBrush x:Key="ListViewItemBackgroundPressed" Color="#0AFFFFFF" />
+              <SolidColorBrush x:Key="ListViewItemBackgroundPointerOver" Color="#08000000" />
+              <SolidColorBrush x:Key="ListViewItemBackgroundPressed" Color="#10000000" />
               <SolidColorBrush x:Key="ListViewItemBackgroundSelected" Color="Transparent" />
             </ListView.Resources>
             <ListView.ItemTemplate>
@@ -129,24 +133,15 @@
             <Grid Grid.Row="2" ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition /></Grid.ColumnDefinitions><Button Content="立即保存" Command="{x:Bind ViewModel.SaveCommand}" IsEnabled="{x:Bind ViewModel.IsServerRunning, Mode=OneWay}" Style="{StaticResource CompactPalButtonStyle}" HorizontalAlignment="Stretch" /><Button Grid.Column="1" Content="保存并重启" Command="{x:Bind ViewModel.RestartCommand}" IsEnabled="{x:Bind ViewModel.IsServerRunning, Mode=OneWay}" Style="{StaticResource PrimaryPalButtonStyle}" HorizontalAlignment="Stretch" /></Grid>
             <Grid Grid.Row="3" ColumnSpacing="8">
               <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition /></Grid.ColumnDefinitions>
-              <Button Content="保存并关服" Command="{x:Bind ViewModel.SaveStopCommand}" IsEnabled="{x:Bind ViewModel.IsServerRunning, Mode=OneWay}" Style="{StaticResource MaintenanceButtonStyle}" HorizontalAlignment="Stretch">
-                <Button.Resources>
-                  <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#30FF9F0A" />
-                  <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#18FF9F0A" />
-                  <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#52FF9F0A" />
-                  <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="#38FF9F0A" />
-                  <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="#FFE0A8" />
-                  <SolidColorBrush x:Key="ButtonForegroundPressed" Color="#FFC66D" />
-                </Button.Resources>
-              </Button>
+              <Button Content="保存并关服" Command="{x:Bind ViewModel.SaveStopCommand}" IsEnabled="{x:Bind ViewModel.IsServerRunning, Mode=OneWay}" Style="{StaticResource CompactPalButtonStyle}" HorizontalAlignment="Stretch" />
               <Button Grid.Column="1" Content="不保存强制关服" Command="{x:Bind ViewModel.ForceStopCommand}" IsEnabled="{x:Bind ViewModel.IsServerRunning, Mode=OneWay}" Style="{StaticResource DangerButtonStyle}" HorizontalAlignment="Stretch">
                 <Button.Resources>
-                  <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#30FF453A" />
-                  <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#18FF453A" />
-                  <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#58FF453A" />
-                  <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="#40FF453A" />
-                  <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="#FFAAA4" />
-                  <SolidColorBrush x:Key="ButtonForegroundPressed" Color="#FF8179" />
+                  <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#18FF3B30" />
+                  <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#24FF3B30" />
+                  <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#38FF3B30" />
+                  <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="#48FF3B30" />
+                  <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="#C70015" />
+                  <SolidColorBrush x:Key="ButtonForegroundPressed" Color="#A50012" />
                 </Button.Resources>
               </Button>
             </Grid>
