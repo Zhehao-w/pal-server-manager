@@ -368,9 +368,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private async Task RunMonitorAsync(CancellationToken cancellationToken)
     {
-        try
+        var recoveringFromFailure = false;
+        while (!cancellationToken.IsCancellationRequested)
         {
-            while (!cancellationToken.IsCancellationRequested)
+            try
             {
                 var now = DateTimeOffset.Now;
                 if (now >= _nextMonitorCycle && !IsBusy)
@@ -386,19 +387,31 @@ public partial class MainViewModel : ObservableObject, IDisposable
                     }
                     else ResetStoppedDisplay();
                     UpdatedAt = $"更新于 {DateTime.Now:HH:mm:ss}";
+                    if (recoveringFromFailure)
+                    {
+                        StatusMessage = IsServerRunning ? "服务器状态监测已恢复。" : "服务器状态监测已恢复；服务器当前未运行。";
+                        recoveringFromFailure = false;
+                    }
                 }
-                await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { break; }
+            catch (Exception exception)
+            {
+                recoveringFromFailure = true;
+                StatusMessage = $"状态刷新暂时失败，将自动重试：{exception.Message}";
+            }
+
+            try { await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken); }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { break; }
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
-        catch (Exception exception) { StatusMessage = $"状态刷新已停止：{exception.Message}"; }
     }
 
     private async Task RunAutomationClockAsync(CancellationToken cancellationToken)
     {
-        try
+        var recoveringFromFailure = false;
+        while (!cancellationToken.IsCancellationRequested)
         {
-            while (!cancellationToken.IsCancellationRequested)
+            try
             {
                 var now = DateTimeOffset.Now;
                 if (_scheduledAt is { } scheduled)
@@ -451,11 +464,22 @@ public partial class MainViewModel : ObservableObject, IDisposable
                     ApplyPlayerSnapshot(_roster.GetCurrentSnapshot(now));
                     _nextPlayerDurationUpdate = now.AddMinutes(1);
                 }
-                await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+                if (recoveringFromFailure)
+                {
+                    StatusMessage = "自动操作计时已恢复。";
+                    recoveringFromFailure = false;
+                }
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { break; }
+            catch (Exception exception)
+            {
+                recoveringFromFailure = true;
+                StatusMessage = $"自动操作计时暂时失败，将自动重试：{exception.Message}";
+            }
+
+            try { await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken); }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { break; }
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
-        catch (Exception exception) { StatusMessage = $"自动操作计时已停止：{exception.Message}"; }
     }
 
     private async Task RefreshProcessAsync(DateTimeOffset now, CancellationToken cancellationToken)
