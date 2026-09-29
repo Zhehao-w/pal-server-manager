@@ -61,6 +61,7 @@ public sealed class PalWorldIniDocument
     public void SetValue(string key, string value)
     {
         if (string.IsNullOrWhiteSpace(key) || key.Contains('=')) throw new ArgumentException("配置键无效。", nameof(key));
+        WorldSettingsValueValidator.ValidateManagedValue(key, value);
         var entry = _entries.FirstOrDefault(item => string.Equals(item.Key, key, StringComparison.OrdinalIgnoreCase));
         if (entry is null) _entries.Add(new Entry(key, value));
         else entry.Value = value;
