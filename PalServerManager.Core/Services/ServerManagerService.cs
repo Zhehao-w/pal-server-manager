@@ -87,7 +87,7 @@ public sealed class ServerManagerService(
         if (wasRunning) await SaveAndStopCoreAsync(token);
         var registry = await slots.LoadAsync(token);
         await identity.AuditOrThrowAsync(registry, cancellationToken: token);
-        await backups.RestoreAsync(registry, backup, token);
+        await Task.Run(() => backups.RestoreAsync(registry, backup, token), token);
         if (restartAfterRestore || wasRunning) await StartActiveTransactionalAsync(token);
     }, ct);
 
