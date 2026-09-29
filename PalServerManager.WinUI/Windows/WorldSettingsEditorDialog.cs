@@ -30,17 +30,23 @@ public static class WorldSettingsEditorDialog
                 : serverRunning ? "修改将在服务器下次启动后生效。" : "保存后，将在下次启动此存档时生效。",
             Foreground = Brush("PalMutedTextBrush"),
             TextWrapping = TextWrapping.Wrap,
-            FontSize = 12
+            FontSize = 12,
+            VerticalAlignment = VerticalAlignment.Center
         };
 
-        var body = new StackPanel { Spacing = 16 };
-        body.Children.Add(new TextBlock
+        var body = new StackPanel
+        {
+            Spacing = 18,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        var header = new StackPanel { Spacing = 5 };
+        header.Children.Add(new TextBlock
         {
             Text = existingWorldImport ? "导入现有存档 · 自定义世界设置" : session.IsDraft ? "新存档 · 自定义世界设置" : $"存档 {session.SlotId} · {session.Tag}",
             FontSize = 22,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
         });
-        body.Children.Add(new TextBlock
+        header.Children.Add(new TextBlock
         {
             Text = includeGlobalSettings
                 ? "每个存档的设置分别保存在 JSON 配置档中。服务器名称等位于最下方的全局区域，不会进入存档配置。"
@@ -49,6 +55,7 @@ public static class WorldSettingsEditorDialog
             TextWrapping = TextWrapping.Wrap,
             FontSize = 12
         });
+        body.Children.Add(header);
 
         foreach (var category in WorldSettingsService.ProfileDefinitions.Select(item => item.Category).Distinct())
         {
@@ -98,7 +105,8 @@ public static class WorldSettingsEditorDialog
             Content = body,
             MaxWidth = 840,
             MaxHeight = 640,
-            Padding = new Thickness(2, 0, 8, 0),
+            Padding = new Thickness(0),
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
         };
@@ -151,8 +159,7 @@ public static class WorldSettingsEditorDialog
             Text = title,
             FontSize = 13,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-            Foreground = Brush("PalMutedTextBrush"),
-            Margin = new Thickness(8, 0, 0, 0)
+            Foreground = Brush("PalMutedTextBrush")
         });
 
         var rows = new StackPanel { Spacing = 0 };
@@ -172,7 +179,7 @@ public static class WorldSettingsEditorDialog
         for (var index = 0; index < definitions.Count; index++)
         {
             var definition = definitions[index];
-            var row = new Grid { MinHeight = 62, ColumnSpacing = 18, Padding = new Thickness(16, 8, 14, 8) };
+            var row = new Grid { MinHeight = 64, ColumnSpacing = 20, Padding = new Thickness(16, 8, 16, 8) };
             ToolTipService.SetToolTip(row, $"INI: {definition.Key}\n{definition.Description}");
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(236) });
@@ -180,13 +187,14 @@ public static class WorldSettingsEditorDialog
             text.Children.Add(new TextBlock { Text = definition.Label, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
             text.Children.Add(new TextBlock { Text = definition.Description, Foreground = Brush("PalMutedTextBrush"), FontSize = 11, TextWrapping = TextWrapping.Wrap });
             var control = CreateControl(definition, values.TryGetValue(definition.Key, out var value) ? value : "");
+            control.MinHeight = 32;
             control.VerticalAlignment = VerticalAlignment.Center;
             Grid.SetColumn(control, 1);
             row.Children.Add(text);
             row.Children.Add(control);
             rows.Children.Add(row);
             if (index < definitions.Count - 1)
-                rows.Children.Add(new Border { Height = 1, Background = Brush("PalBorderBrush"), Margin = new Thickness(16, 0, 14, 0), Opacity = 0.45 });
+                rows.Children.Add(new Border { Height = 1, Background = Brush("PalBorderBrush"), Margin = new Thickness(16, 0, 16, 0), Opacity = 0.45 });
             controls[definition.Key] = control;
         }
 
