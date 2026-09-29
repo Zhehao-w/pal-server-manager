@@ -23,7 +23,7 @@
       </Grid>
     </Grid>
 
-    <Grid Grid.Row="1" Padding="22,16,22,20" RowSpacing="12">
+    <Grid x:Name="ContentGrid" Grid.Row="1" Padding="22,16,22,20" RowSpacing="12">
       <Grid.RowDefinitions>
         <RowDefinition Height="Auto" />
         <RowDefinition Height="Auto" />
