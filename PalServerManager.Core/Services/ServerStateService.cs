@@ -42,6 +42,7 @@ public sealed class ServerStateService(AppPaths app, SafeFileService files)
 
         try { await ValidateStateAsync(root, server, cancellationToken); }
         catch (Exception error) { return new(ServerStateKind.InvalidState, $"管理状态无效：{error.Message}", server); }
+        CleanupPreservedAttachStateBestEffort(root);
         return new(ServerStateKind.Ready, "管理状态已验证。", server);
     }
 
@@ -127,7 +128,7 @@ public sealed class ServerStateService(AppPaths app, SafeFileService files)
                     Directory.Move(preserved, root);
                 throw;
             }
-            if (preserved is not null && Directory.Exists(preserved)) Directory.Delete(preserved, recursive: true);
+            CleanupPreservedAttachStateBestEffort(root);
         }
         catch
         {
@@ -140,6 +141,19 @@ public sealed class ServerStateService(AppPaths app, SafeFileService files)
     private bool HasStagingDirectory(RegisteredServer server) =>
         Directory.Exists(app.ServersStateRoot) &&
         Directory.EnumerateDirectories(app.ServersStateRoot, $".*-{server.Id}-*").Any();
+
+    private static void CleanupPreservedAttachStateBestEffort(string root)
+    {
+        var parent = Path.GetDirectoryName(root);
+        if (parent is null || !Directory.Exists(parent)) return;
+        var prefix = Path.GetFileName(root) + ".empty-before-attach-";
+        foreach (var path in Directory.EnumerateDirectories(parent)
+                     .Where(path => Path.GetFileName(path).StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
+        {
+            try { Directory.Delete(path, recursive: true); }
+            catch { }
+        }
+    }
 
     private static SaveSlotRegistry BuildRegistry(DiscoveredWorld active, string saveRoot)
     {
