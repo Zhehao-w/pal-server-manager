@@ -134,14 +134,14 @@ internal static class P1RegressionTests
                 True(!Directory.Exists(currentParked), "old active world remained parked after recovery");
                 True(!Directory.Exists(transactionOld), "temporary old-world authority remained after recovery");
                 True(!File.Exists(env.Context.StatePaths.WorldProfilePath(1)), "failed new-world profile survived recovery");
-                True(originalRegistry.SequenceEqual(await File.ReadAllBytesAsync(env.Context.StatePaths.RegistryPath)),
-                    "registry bytes were not restored");
-                True(originalRuntime.SequenceEqual(await File.ReadAllBytesAsync(env.Context.ServerPaths.SettingsPath)),
-                    "runtime INI bytes were not restored");
-                True(originalUser.SequenceEqual(await File.ReadAllBytesAsync(env.Context.ServerPaths.UserSettingsPath)),
-                    "GameUserSettings.ini bytes were not restored");
-                True(originalBuildState.SequenceEqual(await File.ReadAllBytesAsync(env.Context.StatePaths.BuildStatePath)),
-                    "build-state bytes were not restored");
+                var restoredRegistryBytes = await File.ReadAllBytesAsync(env.Context.StatePaths.RegistryPath);
+                var restoredRuntimeBytes = await File.ReadAllBytesAsync(env.Context.ServerPaths.SettingsPath);
+                var restoredUserBytes = await File.ReadAllBytesAsync(env.Context.ServerPaths.UserSettingsPath);
+                var restoredBuildStateBytes = await File.ReadAllBytesAsync(env.Context.StatePaths.BuildStatePath);
+                True(originalRegistry.SequenceEqual(restoredRegistryBytes), "registry bytes were not restored");
+                True(originalRuntime.SequenceEqual(restoredRuntimeBytes), "runtime INI bytes were not restored");
+                True(originalUser.SequenceEqual(restoredUserBytes), "GameUserSettings.ini bytes were not restored");
+                True(originalBuildState.SequenceEqual(restoredBuildStateBytes), "build-state bytes were not restored");
                 await identity.AuditOrThrowAsync(restored, checkInterruptedOperation: false);
                 True(File.Exists(env.Context.StatePaths.PendingOperationPath), "recovery helper cleared transaction authority before caller completion");
                 journal.Complete();
