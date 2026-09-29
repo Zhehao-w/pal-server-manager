@@ -15,6 +15,7 @@
         <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
           <Image Source="ms-appx:///Assets/ManagerIconCircular.png" Width="24" Height="24" VerticalAlignment="Center" />
           <TextBlock Text="PalServerManager" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
+          <TextBlock Text="by Zhehao-w" Foreground="{StaticResource PalMutedTextBrush}" FontSize="11" VerticalAlignment="Center" />
           <TextBlock Text="·" Foreground="{StaticResource PalMutedTextBrush}" FontSize="11" VerticalAlignment="Center" />
           <TextBlock VerticalAlignment="Center" Foreground="{StaticResource PalMutedTextBrush}" FontSize="11"><Run x:Name="VersionRun" /></TextBlock>
         </StackPanel>

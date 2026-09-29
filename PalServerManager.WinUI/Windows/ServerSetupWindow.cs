@@ -62,6 +62,7 @@ public sealed class ServerSetupWindow : Window
         var titleStack = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 9, VerticalAlignment = VerticalAlignment.Center };
         titleStack.Children.Add(new Image { Source = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri("ms-appx:///Assets/ManagerIconCircular.png")), Width = 24, Height = 24 });
         titleStack.Children.Add(new TextBlock { Text = App.ProductName, FontSize = 15, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center });
+        titleStack.Children.Add(new TextBlock { Text = "by Zhehao-w", Foreground = Brush("PalMutedTextBrush"), FontSize = 11, VerticalAlignment = VerticalAlignment.Center });
         titleStack.Children.Add(new TextBlock { Text = "·", Foreground = Brush("PalMutedTextBrush"), FontSize = 11, VerticalAlignment = VerticalAlignment.Center });
         titleStack.Children.Add(new TextBlock { Text = $"v{App.Version}", Foreground = Brush("PalMutedTextBrush"), FontSize = 11, VerticalAlignment = VerticalAlignment.Center });
         titleBar.Children.Add(titleStack);
