@@ -1,6 +1,10 @@
 using System.Linq;
+using HaoHaoTianTian.PalHR.Services;
+using Microsoft.UI;
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using WinRT.Interop;
 
 namespace HaoHaoTianTian.PalHR;
 
@@ -11,6 +15,7 @@ public sealed partial class MainWindow
     private Grid? _dashboardGrid;
     private ScrollViewer? _dashboardScroller;
     private bool _responsiveLayoutInitialized;
+    private double _lastRasterizationScale;
 
     private void RootGrid_Loaded(object sender, RoutedEventArgs e)
     {
@@ -22,8 +27,29 @@ public sealed partial class MainWindow
             .FirstOrDefault(child => Grid.GetRow(child) == 1);
         if (_dashboardGrid is null) return;
 
+        var xamlRoot = RootGrid.XamlRoot;
+        _lastRasterizationScale = xamlRoot.RasterizationScale;
+        xamlRoot.Changed += (_, _) =>
+        {
+            var scale = xamlRoot.RasterizationScale;
+            if (Math.Abs(scale - _lastRasterizationScale) < 0.001) return;
+            _lastRasterizationScale = scale;
+            ApplyResponsiveMinimum();
+        };
+
+        ApplyResponsiveMinimum();
         RootGrid.SizeChanged += (_, args) => UpdateConstrainedLayout(args.NewSize.Height);
         UpdateConstrainedLayout(RootGrid.ActualHeight);
+    }
+
+    private void ApplyResponsiveMinimum()
+    {
+        var windowId = Win32Interop.GetWindowIdFromWindow(WindowNative.GetWindowHandle(this));
+        var workArea = DisplayArea.GetFromWindowId(windowId, DisplayAreaFallback.Primary).WorkArea;
+        if (_appWindow.Presenter is not OverlappedPresenter presenter) return;
+
+        presenter.PreferredMinimumWidth = Math.Min(WindowPlacement.EffectivePixelsToPhysical(windowId, 1000), workArea.Width);
+        presenter.PreferredMinimumHeight = Math.Min(WindowPlacement.EffectivePixelsToPhysical(windowId, 740), workArea.Height);
     }
 
     private void UpdateConstrainedLayout(double windowHeight)
