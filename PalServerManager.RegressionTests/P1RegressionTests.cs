@@ -1,17 +1,15 @@
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using HaoHaoTianTian.PalHR.Models;
 using HaoHaoTianTian.PalHR.Services;
 
+partial class Program
+{
+    static Program() => P1RegressionTests.RunAsync().GetAwaiter().GetResult();
+}
+
 internal static class P1RegressionTests
 {
-    [ModuleInitializer]
-    internal static void Run()
-    {
-        RunAsync().GetAwaiter().GetResult();
-    }
-
-    private static async Task RunAsync()
+    internal static async Task RunAsync()
     {
         Console.WriteLine("RUN P1 create-world rollback authority");
         await CreateWorldRollbackRestoresBothAuthoritiesAsync();
