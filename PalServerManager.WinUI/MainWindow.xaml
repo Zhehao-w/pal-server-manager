@@ -4,7 +4,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="PalServerManager">
 
-  <Grid x:Name="RootGrid" Background="Transparent" Loaded="RootGrid_Loaded">
+  <Grid x:Name="RootGrid" Background="{StaticResource PalWindowTintBrush}" Loaded="RootGrid_Loaded">
     <Grid.RowDefinitions>
       <RowDefinition Height="48" />
       <RowDefinition Height="*" />
@@ -130,10 +130,32 @@
             <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="32" /><RowDefinition Height="32" /><RowDefinition Height="32" /></Grid.RowDefinitions>
             <TextBlock Text="服务器操作" Style="{StaticResource SectionHeadingStyle}" />
             <TextBlock Grid.Row="1" Text="保存、重启、关服或回档当前存档。" Foreground="{StaticResource PalMutedTextBrush}" FontSize="11" />
-            <Grid Grid.Row="2" ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition /></Grid.ColumnDefinitions><Button Content="立即保存" Command="{x:Bind ViewModel.SaveCommand}" IsEnabled="{x:Bind ViewModel.IsServerRunning, Mode=OneWay}" Style="{StaticResource CompactPalButtonStyle}" HorizontalAlignment="Stretch" /><Button Grid.Column="1" Content="保存并重启" Command="{x:Bind ViewModel.RestartCommand}" IsEnabled="{x:Bind ViewModel.IsServerRunning, Mode=OneWay}" Style="{StaticResource PrimaryPalButtonStyle}" HorizontalAlignment="Stretch" /></Grid>
+            <Grid Grid.Row="2" ColumnSpacing="8">
+              <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition /></Grid.ColumnDefinitions>
+              <Button Content="立即保存" Command="{x:Bind ViewModel.SaveCommand}" IsEnabled="{x:Bind ViewModel.IsServerRunning, Mode=OneWay}" Style="{StaticResource CompactPalButtonStyle}" HorizontalAlignment="Stretch" />
+              <Button Grid.Column="1" Content="保存并重启" Command="{x:Bind ViewModel.RestartCommand}" IsEnabled="{x:Bind ViewModel.IsServerRunning, Mode=OneWay}" Style="{StaticResource RestartButtonStyle}" HorizontalAlignment="Stretch">
+                <Button.Resources>
+                  <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#E7F0F9" />
+                  <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#DDEAF6" />
+                  <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#B4CCE2" />
+                  <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="#A5C2DB" />
+                  <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="#0B5C9B" />
+                  <SolidColorBrush x:Key="ButtonForegroundPressed" Color="#084A7D" />
+                </Button.Resources>
+              </Button>
+            </Grid>
             <Grid Grid.Row="3" ColumnSpacing="8">
               <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition /></Grid.ColumnDefinitions>
-              <Button Content="保存并关服" Command="{x:Bind ViewModel.SaveStopCommand}" IsEnabled="{x:Bind ViewModel.IsServerRunning, Mode=OneWay}" Style="{StaticResource CompactPalButtonStyle}" HorizontalAlignment="Stretch" />
+              <Button Content="保存并关服" Command="{x:Bind ViewModel.SaveStopCommand}" IsEnabled="{x:Bind ViewModel.IsServerRunning, Mode=OneWay}" Style="{StaticResource NormalExitButtonStyle}" HorizontalAlignment="Stretch">
+                <Button.Resources>
+                  <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#D2E5F8" />
+                  <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#C4DCF4" />
+                  <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#9FC4E8" />
+                  <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="#8CB7E0" />
+                  <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="#004F91" />
+                  <SolidColorBrush x:Key="ButtonForegroundPressed" Color="#004176" />
+                </Button.Resources>
+              </Button>
               <Button Grid.Column="1" Content="不保存强制关服" Command="{x:Bind ViewModel.ForceStopCommand}" IsEnabled="{x:Bind ViewModel.IsServerRunning, Mode=OneWay}" Style="{StaticResource DangerButtonStyle}" HorizontalAlignment="Stretch">
                 <Button.Resources>
                   <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#18FF3B30" />
