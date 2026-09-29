@@ -37,7 +37,7 @@ internal static class P2P3RegressionTests
     private static void WorldSettingRangesAreEnforced()
     {
         var valid = CreateValidProfileValues();
-        WorldSettingsValueValidator.ValidateProfile(valid);
+        WorldSettingsService.ValidateProfileValues(valid);
 
         var bounded = WorldSettingsService.ProfileDefinitions.First(definition =>
             definition.Kind is WorldSettingKind.Number or WorldSettingKind.Integer &&
@@ -46,7 +46,7 @@ internal static class P2P3RegressionTests
         {
             [bounded.Key] = (bounded.Maximum + 1).ToString(CultureInfo.InvariantCulture)
         };
-        Throws<InvalidOperationException>(() => WorldSettingsValueValidator.ValidateProfile(invalid));
+        Throws<InvalidOperationException>(() => WorldSettingsService.ValidateProfileValues(invalid));
 
         var document = PalWorldIniDocument.Parse("[/Script/Pal.PalGameWorldSettings]\nOptionSettings=(ServerPlayerMaxNum=32)");
         Throws<InvalidOperationException>(() => document.SetValue("ServerPlayerMaxNum", "129"));
