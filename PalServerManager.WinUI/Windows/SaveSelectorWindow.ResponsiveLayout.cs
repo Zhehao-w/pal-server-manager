@@ -10,7 +10,7 @@ namespace HaoHaoTianTian.PalHR.Windows;
 public sealed partial class SaveSelectorWindow
 {
     private const double ConstrainedWindowHeight = 620;
-    private const double ConstrainedContentHeight = 572;
+    private const double ConstrainedContentHeight = 566;
     private ScrollViewer? _contentScroller;
     private bool _responsiveLayoutInitialized;
     private double _lastRasterizationScale;
