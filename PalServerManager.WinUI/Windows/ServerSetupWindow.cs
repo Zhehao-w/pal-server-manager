@@ -19,7 +19,7 @@ public sealed class ServerSetupWindow : Window
     private readonly TaskCompletionSource<RegisteredServer?> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly ComboBox _servers = new() { MinWidth = 430, PlaceholderText = "选择已登记的服务器" };
     private readonly ComboBox _candidates = new() { MinWidth = 430, PlaceholderText = "选择自动发现的 PalServer" };
-    private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap, MaxWidth = 640, Foreground = Brush("PalMintBrush") };
+    private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap, MaxWidth = 640, Foreground = Brush("PalTextBrush") };
     private readonly TextBlock _summary = new() { TextWrapping = TextWrapping.Wrap, MaxWidth = 640, Foreground = Brush("PalMutedTextBrush") };
     private readonly Button _continue = new() { Content = "进入管理器", Style = Style("PrimaryPalButtonStyle") };
     private readonly Button _attach = new() { Content = "接入并继续", Style = Style("PrimaryPalButtonStyle") };
@@ -44,11 +44,12 @@ public sealed class ServerSetupWindow : Window
         SystemBackdrop = new MicaBackdrop();
         var id = Win32Interop.GetWindowIdFromWindow(WindowNative.GetWindowHandle(this));
         var appWindow = AppWindow.GetFromWindowId(id);
+        var workArea = DisplayArea.GetFromWindowId(id, DisplayAreaFallback.Primary).WorkArea;
         Services.WindowPlacement.CenterOnPrimaryDisplay(appWindow, id, 760, 650);
         if (appWindow.Presenter is OverlappedPresenter presenter)
         {
-            presenter.PreferredMinimumWidth = 700;
-            presenter.PreferredMinimumHeight = 590;
+            presenter.PreferredMinimumWidth = Math.Min(Services.WindowPlacement.EffectivePixelsToPhysical(id, 700), workArea.Width);
+            presenter.PreferredMinimumHeight = Math.Min(Services.WindowPlacement.EffectivePixelsToPhysical(id, 590), workArea.Height);
         }
 
         _panel.Children.Add(new TextBlock { Text = App.ProductName, FontSize = 13, Foreground = Brush("PalMutedTextBrush") });

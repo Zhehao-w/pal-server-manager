@@ -82,7 +82,16 @@
           <TextBox Grid.Column="1" Text="{x:Bind ViewModel.EditTag, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="输入新标签；切换选择后会清空" MaxLength="40" />
           <Button Grid.Column="2" Content="世界设置…" Command="{x:Bind ViewModel.EditSelectedWorldSettingsCommand}" />
           <Button Grid.Column="3" Content="保存标签" Command="{x:Bind ViewModel.RenameTagCommand}" />
-          <Button Grid.Column="4" Content="删除存档…" Command="{x:Bind ViewModel.DeleteWorldCommand}" Style="{StaticResource DangerButtonStyle}" />
+          <Button Grid.Column="4" Content="删除存档…" Command="{x:Bind ViewModel.DeleteWorldCommand}" Style="{StaticResource DangerButtonStyle}">
+            <Button.Resources>
+              <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#57343B" />
+              <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#302428" />
+              <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#A66472" />
+              <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="#76505A" />
+              <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="#FFC7C0" />
+              <SolidColorBrush x:Key="ButtonForegroundPressed" Color="#EFA69E" />
+            </Button.Resources>
+          </Button>
         </Grid>
       </Border>
 

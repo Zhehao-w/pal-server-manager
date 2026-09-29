@@ -41,6 +41,19 @@
       <SolidColorBrush x:Key="ControlStrokeColorDefaultBrush" Color="#52FFFFFF" />
       <SolidColorBrush x:Key="ControlStrokeColorSecondaryBrush" Color="#32FFFFFF" />
 
+      <SolidColorBrush x:Key="AccentButtonBackground" Color="{StaticResource PalCyanColor}" />
+      <SolidColorBrush x:Key="AccentButtonBackgroundPointerOver" Color="#7CC6F6" />
+      <SolidColorBrush x:Key="AccentButtonBackgroundPressed" Color="#4FA5DF" />
+      <SolidColorBrush x:Key="AccentButtonBackgroundDisabled" Color="#5568B9F2" />
+      <SolidColorBrush x:Key="AccentButtonForeground" Color="#10242A" />
+      <SolidColorBrush x:Key="AccentButtonForegroundPointerOver" Color="#10242A" />
+      <SolidColorBrush x:Key="AccentButtonForegroundPressed" Color="#10242A" />
+      <SolidColorBrush x:Key="AccentButtonForegroundDisabled" Color="#8010242A" />
+      <SolidColorBrush x:Key="AccentButtonBorderBrush" Color="#70DCE7" />
+      <SolidColorBrush x:Key="AccentButtonBorderBrushPointerOver" Color="#A7E3FA" />
+      <SolidColorBrush x:Key="AccentButtonBorderBrushPressed" Color="#70C5EA" />
+      <SolidColorBrush x:Key="AccentButtonBorderBrushDisabled" Color="#3568B9F2" />
+
       <Style x:Key="CardStyle" TargetType="Border">
         <Setter Property="Background" Value="{StaticResource PalCardBrush}" />
         <Setter Property="BorderBrush" Value="{StaticResource PalBorderBrush}" />
@@ -124,10 +137,14 @@
         <Setter Property="BorderThickness" Value="1" />
       </Style>
 
-      <Style x:Key="PrimaryPalButtonStyle" TargetType="Button" BasedOn="{StaticResource ColoredPalButtonBaseStyle}">
-        <Setter Property="Background" Value="{StaticResource PalCyanBrush}" />
-        <Setter Property="Foreground" Value="#10242A" />
-        <Setter Property="BorderBrush" Value="#70DCE7" />
+      <Style x:Key="PrimaryPalButtonStyle" TargetType="Button" BasedOn="{StaticResource AccentButtonStyle}">
+        <Setter Property="MinHeight" Value="32" />
+        <Setter Property="Padding" Value="12,6" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="UseSystemFocusVisuals" Value="True" />
+        <Setter Property="CornerRadius" Value="9" />
+        <Setter Property="BorderThickness" Value="1" />
         <Setter Property="FontWeight" Value="SemiBold" />
       </Style>
 
