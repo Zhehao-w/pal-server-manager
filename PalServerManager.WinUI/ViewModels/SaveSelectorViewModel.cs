@@ -53,21 +53,33 @@ public partial class SaveSelectorViewModel(SaveSlotService slots, BackupService 
 
     partial void OnEditTagChanged(string value) => RenameTagCommand.NotifyCanExecuteChanged();
 
+    partial void OnIsBusyChanged(bool value)
+    {
+        RenameTagCommand.NotifyCanExecuteChanged();
+        StartSelectedCommand.NotifyCanExecuteChanged();
+        EditSelectedWorldSettingsCommand.NotifyCanExecuteChanged();
+        DeleteWorldCommand.NotifyCanExecuteChanged();
+        EditNewWorldSettingsCommand.NotifyCanExecuteChanged();
+        CreateCommand.NotifyCanExecuteChanged();
+        RollbackCommand.NotifyCanExecuteChanged();
+        CancelCommand.NotifyCanExecuteChanged();
+    }
+
     private bool CanRenameTag() =>
         !IsBusy && SelectedSave is not null && !string.IsNullOrWhiteSpace(EditTag) &&
         !string.Equals(EditTag.Trim(), SelectedSave.Tag, StringComparison.Ordinal);
 
     private bool CanStartSelected() => !IsBusy && SelectedSave is not null;
     private bool CanDeleteWorld() => !IsBusy && SelectedSave is not null && _registry is not null && SelectedSave.Id != _registry.ActiveSlotId;
+    private bool CanRunStandaloneAction() => !IsBusy;
 
     [RelayCommand(CanExecute = nameof(CanDeleteWorld))]
     private async Task DeleteWorldAsync()
     {
-        if (SelectedSave is null || ConfirmAsync is null) return;
+        if (IsBusy || SelectedSave is null || ConfirmAsync is null) return;
         var selected = SelectedSave;
         if (!await ConfirmAsync("删除存档", $"编号：{selected.Id}\n标签：{selected.Tag}\n世界 UID：{selected.WorldUid}\n\n服务器必须已关闭，当前存档不能删除。管理器会先创建并验证可恢复的保护快照，再删除此停放存档。继续吗？")) return;
         IsBusy = true;
-        DeleteWorldCommand.NotifyCanExecuteChanged();
         try
         {
             var snapshot = await deletion.DeleteAsync(selected.Id);
@@ -75,17 +87,13 @@ public partial class SaveSelectorViewModel(SaveSlotService slots, BackupService 
             Feedback = $"存档 {selected.Id} 已删除，保护快照保留：{snapshot}";
         }
         catch (Exception exception) { Feedback = $"删除失败：{exception.Message}"; }
-        finally
-        {
-            IsBusy = false;
-            DeleteWorldCommand.NotifyCanExecuteChanged();
-        }
+        finally { IsBusy = false; }
     }
 
     [RelayCommand(CanExecute = nameof(CanStartSelected))]
     private async Task EditSelectedWorldSettingsAsync()
     {
-        if (SelectedSave is null || _registry is null || EditWorldSettingsAsync is null) return;
+        if (IsBusy || SelectedSave is null || _registry is null || EditWorldSettingsAsync is null) return;
         IsBusy = true;
         try
         {
@@ -97,11 +105,7 @@ public partial class SaveSelectorViewModel(SaveSlotService slots, BackupService 
             Feedback = "世界设置已保存，将在此存档下次启动时生效。";
         }
         catch (Exception exception) { Feedback = $"世界设置操作失败：{exception.Message}"; }
-        finally
-        {
-            IsBusy = false;
-            EditSelectedWorldSettingsCommand.NotifyCanExecuteChanged();
-        }
+        finally { IsBusy = false; }
     }
 
     partial void OnSelectedWorldSettingsSourceChanged(WorldSettingsSourceOption value)
@@ -114,28 +118,33 @@ public partial class SaveSelectorViewModel(SaveSlotService slots, BackupService 
         EditNewWorldSettingsCommand.NotifyCanExecuteChanged();
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanRunStandaloneAction))]
     private async Task EditNewWorldSettingsAsync()
     {
-        if (_registry is null || EditWorldSettingsAsync is null) return;
-        try
-        {
-            var active = slots.GetSlot(_registry, _registry.ActiveSlotId);
-            var session = await worldSettings.CreateDraftSessionAsync(SelectedWorldSettingsSource.Mode, active, _customDraft, _customGlobals);
-            var result = await EditWorldSettingsAsync(session);
-            if (result is null) return;
-            _customDraft = result.ProfileValues;
-            _customGlobals = result.GlobalValues;
-            SelectedWorldSettingsSource = WorldSettingsSources.Single(item => item.Mode == NewWorldSettingsMode.Custom);
-            Feedback = "新存档的自定义设置已准备好。";
-        }
+        if (IsBusy) return;
+        IsBusy = true;
+        try { await EditNewWorldSettingsCoreAsync(); }
         catch (Exception exception) { Feedback = $"无法编辑新存档设置：{exception.Message}"; }
+        finally { IsBusy = false; }
+    }
+
+    private async Task EditNewWorldSettingsCoreAsync()
+    {
+        if (_registry is null || EditWorldSettingsAsync is null) return;
+        var active = slots.GetSlot(_registry, _registry.ActiveSlotId);
+        var session = await worldSettings.CreateDraftSessionAsync(SelectedWorldSettingsSource.Mode, active, _customDraft, _customGlobals);
+        var result = await EditWorldSettingsAsync(session);
+        if (result is null) return;
+        _customDraft = result.ProfileValues;
+        _customGlobals = result.GlobalValues;
+        SelectedWorldSettingsSource = WorldSettingsSources.Single(item => item.Mode == NewWorldSettingsMode.Custom);
+        Feedback = "新存档的自定义设置已准备好。";
     }
 
     [RelayCommand(CanExecute = nameof(CanRenameTag))]
     private async Task RenameTagAsync()
     {
-        if (SelectedSave is null) return;
+        if (IsBusy || SelectedSave is null) return;
         var selectedId = SelectedSave.Id;
         IsBusy = true;
         try
@@ -147,51 +156,54 @@ public partial class SaveSelectorViewModel(SaveSlotService slots, BackupService 
             Feedback = "标签已更新";
         }
         catch (Exception exception) { Feedback = $"标签修改失败：{exception.Message}"; }
-        finally
-        {
-            IsBusy = false;
-            RenameTagCommand.NotifyCanExecuteChanged();
-            StartSelectedCommand.NotifyCanExecuteChanged();
-        }
+        finally { IsBusy = false; }
     }
 
     [RelayCommand(CanExecute = nameof(CanStartSelected))]
     private void StartSelected()
     {
-        if (SelectedSave is not null) Completed?.Invoke(this, new StartupChoice(StartupMode.Existing, SelectedSave.Id));
+        if (!IsBusy && SelectedSave is not null) Completed?.Invoke(this, new StartupChoice(StartupMode.Existing, SelectedSave.Id));
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanRunStandaloneAction))]
     private async Task CreateAsync()
     {
-        var tag = NewTag.Trim();
-        if (string.IsNullOrWhiteSpace(tag))
+        if (IsBusy) return;
+        IsBusy = true;
+        try
         {
-            Feedback = "请输入新存档标签。";
-            return;
+            var tag = NewTag.Trim();
+            if (string.IsNullOrWhiteSpace(tag))
+            {
+                Feedback = "请输入新存档标签。";
+                return;
+            }
+            try { SaveSlotService.ValidateTag(tag); }
+            catch (Exception exception) { Feedback = exception.Message; return; }
+            if (SelectedWorldSettingsSource.Mode == NewWorldSettingsMode.Custom && _customDraft is null)
+            {
+                await EditNewWorldSettingsCoreAsync();
+                if (_customDraft is null) return;
+            }
+            if (ConfirmAsync is null || !await ConfirmAsync("创建新存档", $"将创建一个全新存档，管理标签为【{tag}】。\n世界设置来源：{SelectedWorldSettingsSource.Label}\n\n标签不会修改 ServerName 或游戏中的世界名称。继续吗？")) return;
+            var settings = new NewWorldSettingsChoice(
+                SelectedWorldSettingsSource.Mode,
+                _customDraft is null ? null : new Dictionary<string, string>(_customDraft, StringComparer.OrdinalIgnoreCase),
+                _customGlobals is null ? null : new Dictionary<string, string>(_customGlobals, StringComparer.OrdinalIgnoreCase));
+            NewTag = "";
+            _customDraft = null;
+            _customGlobals = null;
+            Completed?.Invoke(this, new StartupChoice(StartupMode.Create, Tag: tag, WorldSettings: settings));
         }
-        try { SaveSlotService.ValidateTag(tag); }
-        catch (Exception exception) { Feedback = exception.Message; return; }
-        if (SelectedWorldSettingsSource.Mode == NewWorldSettingsMode.Custom && _customDraft is null)
-        {
-            await EditNewWorldSettingsAsync();
-            if (_customDraft is null) return;
-        }
-        if (ConfirmAsync is null || !await ConfirmAsync("创建新存档", $"将创建一个全新存档，管理标签为【{tag}】。\n世界设置来源：{SelectedWorldSettingsSource.Label}\n\n标签不会修改 ServerName 或游戏中的世界名称。继续吗？")) return;
-        var settings = new NewWorldSettingsChoice(
-            SelectedWorldSettingsSource.Mode,
-            _customDraft is null ? null : new Dictionary<string, string>(_customDraft, StringComparer.OrdinalIgnoreCase),
-            _customGlobals is null ? null : new Dictionary<string, string>(_customGlobals, StringComparer.OrdinalIgnoreCase));
-        NewTag = "";
-        _customDraft = null;
-        _customGlobals = null;
-        Completed?.Invoke(this, new StartupChoice(StartupMode.Create, Tag: tag, WorldSettings: settings));
+        catch (Exception exception) { Feedback = $"无法创建新存档：{exception.Message}"; }
+        finally { IsBusy = false; }
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanRunStandaloneAction))]
     private async Task RollbackAsync()
     {
-        if (_registry is null || ChooseBackupAsync is null) return;
+        if (IsBusy || _registry is null || ChooseBackupAsync is null) return;
+        IsBusy = true;
         try
         {
             var available = await backups.ListAsync(_registry);
@@ -199,10 +211,14 @@ public partial class SaveSelectorViewModel(SaveSlotService slots, BackupService 
             if (choice is not null) Completed?.Invoke(this, new StartupChoice(StartupMode.Rollback, _registry.ActiveSlotId, Backup: choice));
         }
         catch (Exception exception) { Feedback = $"读取备份失败：{exception.Message}"; }
+        finally { IsBusy = false; }
     }
 
-    [RelayCommand]
-    private void Cancel() => Completed?.Invoke(this, null);
+    [RelayCommand(CanExecute = nameof(CanRunStandaloneAction))]
+    private void Cancel()
+    {
+        if (!IsBusy) Completed?.Invoke(this, null);
+    }
 
     private async Task ReloadAsync(int? selectId = null)
     {
