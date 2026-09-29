@@ -597,10 +597,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
             _hasPlayerSnapshot = true;
             return players.Count == 0;
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
             MarkRestFailure(RestEndpoint.Players, exception);
-            StatusMessage = "空服截止时无法再次确认玩家列表，本次自动关服已取消。";
+            StatusMessage = "空服确认失败，自动关服已推迟；将在重新确认空服后重新计时。";
             return false;
         }
     }
