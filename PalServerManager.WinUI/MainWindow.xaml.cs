@@ -64,14 +64,27 @@ public sealed partial class MainWindow : Window
 
     private static void ConfigureTitleBar(AppWindowTitleBar titleBar)
     {
-        titleBar.ButtonForegroundColor = Colors.White;
-        titleBar.ButtonInactiveForegroundColor = global::Windows.UI.Color.FromArgb(150, 245, 245, 247);
+        var foreground = global::Windows.UI.Color.FromArgb(255, 28, 28, 30);
+        titleBar.ButtonForegroundColor = foreground;
+        titleBar.ButtonInactiveForegroundColor = global::Windows.UI.Color.FromArgb(120, 28, 28, 30);
         titleBar.ButtonBackgroundColor = Colors.Transparent;
         titleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
-        titleBar.ButtonHoverBackgroundColor = global::Windows.UI.Color.FromArgb(32, 255, 255, 255);
-        titleBar.ButtonHoverForegroundColor = Colors.White;
-        titleBar.ButtonPressedBackgroundColor = global::Windows.UI.Color.FromArgb(52, 255, 255, 255);
-        titleBar.ButtonPressedForegroundColor = Colors.White;
+        titleBar.ButtonHoverBackgroundColor = global::Windows.UI.Color.FromArgb(18, 0, 0, 0);
+        titleBar.ButtonHoverForegroundColor = foreground;
+        titleBar.ButtonPressedBackgroundColor = global::Windows.UI.Color.FromArgb(30, 0, 0, 0);
+        titleBar.ButtonPressedForegroundColor = foreground;
+    }
+
+    private void AppTitleBar_Loaded(object sender, RoutedEventArgs e) => UpdateTitleBarInset();
+
+    private void AppTitleBar_SizeChanged(object sender, SizeChangedEventArgs e) => UpdateTitleBarInset();
+
+    private void UpdateTitleBarInset()
+    {
+        if (!ExtendsContentIntoTitleBar || AppTitleBar.XamlRoot is null) return;
+        var scale = AppTitleBar.XamlRoot.RasterizationScale;
+        if (scale <= 0) return;
+        TitleBarRightInsetColumn.Width = new GridLength(_appWindow.TitleBar.RightInset / scale);
     }
 
     private async void AppWindow_Closing(AppWindow sender, AppWindowClosingEventArgs args)
