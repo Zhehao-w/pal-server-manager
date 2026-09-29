@@ -198,6 +198,9 @@ public sealed class ServerManagerService(
         var transactionOld = Path.Combine(context.ServerPaths.SaveRoot, $".pal-new-old-{Guid.NewGuid():N}");
         if (Directory.Exists(currentParked)) throw new IOException($"无法停放当前存档，目标已存在：{currentParked}");
         var originalRegistry = await File.ReadAllBytesAsync(context.StatePaths.RegistryPath, ct);
+        var originalBuildState = File.Exists(context.StatePaths.BuildStatePath)
+            ? await File.ReadAllBytesAsync(context.StatePaths.BuildStatePath, ct)
+            : null;
         var runtimeIni = await File.ReadAllBytesAsync(context.ServerPaths.SettingsPath, ct);
         var userIni = await File.ReadAllBytesAsync(context.ServerPaths.UserSettingsPath, ct);
         var op = new PendingOperation { Type = "CreateAndStart", FromSlot = current.Id, FromWorldUid = current.WorldGuid, ToSlot = newId };
@@ -234,7 +237,8 @@ public sealed class ServerManagerService(
         catch (Exception originalError)
         {
             var recovery = new List<Exception>();
-            await RecoverCreateAndStartAsync(newId, transactionOld, currentParked, originalRegistry, runtimeIni, userIni, recovery);
+            await RecoverCreateAndStartAsync(newId, transactionOld, currentParked, originalRegistry, runtimeIni, userIni,
+                originalBuildState, recovery);
             if (recovery.Count == 0) journal.Complete();
             if (recovery.Count > 0)
                 throw new AggregateException("新世界创建失败，且旧世界未能完全自动恢复；事务记录已保留。", new[] { originalError }.Concat(recovery));
@@ -249,6 +253,7 @@ public sealed class ServerManagerService(
         byte[] originalRegistry,
         byte[] runtimeIni,
         byte[] userIni,
+        byte[]? originalBuildState,
         List<Exception> recovery)
     {
         await StopWithoutSavingForRecoveryAsync(recovery);
@@ -284,6 +289,7 @@ public sealed class ServerManagerService(
                 cancellationToken: CancellationToken.None);
         }
         catch (Exception error) { recovery.Add(error); }
+        await RestoreOptionalFileAsync(context.StatePaths.BuildStatePath, originalBuildState, recovery);
         try { worldSettings.DeleteProfileIfExists(newSlotId); }
         catch (Exception error) { recovery.Add(error); }
         try
@@ -298,5 +304,18 @@ public sealed class ServerManagerService(
     { if (!processes.GetSnapshot().IsRunning) return; try { await processes.ForceStopAsync(CancellationToken.None); } catch (Exception e) { errors.Add(e); } }
     private async Task RestoreFileAsync(string path, byte[] content, List<Exception> errors)
     { try { await safeFiles.WriteBytesAsync(path, content, keepPrevious: true); } catch (Exception e) { errors.Add(e); } }
+    private async Task RestoreOptionalFileAsync(string path, byte[]? content, List<Exception> errors)
+    {
+        try
+        {
+            if (content is null)
+            {
+                if (File.Exists(path)) File.Delete(path);
+                return;
+            }
+            await safeFiles.WriteBytesAsync(path, content, keepPrevious: true);
+        }
+        catch (Exception e) { errors.Add(e); }
+    }
     private void RequireRunning() { if (!processes.GetSnapshot().IsRunning) throw new InvalidOperationException("PalServer 当前没有运行。"); }
 }

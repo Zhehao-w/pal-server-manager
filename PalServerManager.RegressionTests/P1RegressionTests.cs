@@ -45,10 +45,20 @@ internal static class P1RegressionTests
                 await File.WriteAllTextAsync(env.Context.ServerPaths.UserSettingsPath, $"DedicatedServerName={oldUid}");
                 await env.Slots.SaveAsync(registry);
                 await WriteProfileAsync(env, oldSlot, oldUid);
+                var originalBuildDocument = new BuildStateDocument();
+                originalBuildDocument.Worlds[oldUid] = new WorldBuildState
+                {
+                    SlotId = 0,
+                    WorldUid = oldUid,
+                    LastSuccessfulBuild = "synthetic:old",
+                    VerifiedUtc = DateTimeOffset.UtcNow
+                };
+                await env.Files.WriteJsonAsync(env.Context.StatePaths.BuildStatePath, originalBuildDocument);
 
                 var originalRegistry = await File.ReadAllBytesAsync(env.Context.StatePaths.RegistryPath);
                 var originalRuntime = await File.ReadAllBytesAsync(env.Context.ServerPaths.SettingsPath);
                 var originalUser = await File.ReadAllBytesAsync(env.Context.ServerPaths.UserSettingsPath);
+                var originalBuildState = await File.ReadAllBytesAsync(env.Context.StatePaths.BuildStatePath);
                 var transactionOld = Path.Combine(env.Context.ServerPaths.SaveRoot, $".pal-new-old-{Guid.NewGuid():N}");
                 var currentParked = Path.Combine(env.Context.ServerPaths.SaveRoot, oldSlot.ParkedFolder);
 
@@ -71,6 +81,16 @@ internal static class P1RegressionTests
                 await env.Slots.SaveAsync(registry);
                 await env.Slots.SetWorldGuidAsync(newUid);
                 await File.WriteAllTextAsync(env.Context.ServerPaths.SettingsPath, "runtime-mutated");
+                var mutatedBuildDocument = new BuildStateDocument();
+                mutatedBuildDocument.Worlds[oldUid] = originalBuildDocument.Worlds[oldUid];
+                mutatedBuildDocument.Worlds[newUid] = new WorldBuildState
+                {
+                    SlotId = 1,
+                    WorldUid = newUid,
+                    LastSuccessfulBuild = "synthetic:new",
+                    VerifiedUtc = DateTimeOffset.UtcNow
+                };
+                await env.Files.WriteJsonAsync(env.Context.StatePaths.BuildStatePath, mutatedBuildDocument, keepPrevious: true);
 
                 var journal = new OperationJournalService(env.Context, env.Files);
                 await journal.WriteAsync(new PendingOperation
@@ -102,7 +122,7 @@ internal static class P1RegressionTests
 
                 var recovery = new List<Exception>();
                 await manager.RecoverCreateAndStartAsync(
-                    1, transactionOld, currentParked, originalRegistry, originalRuntime, originalUser, recovery);
+                    1, transactionOld, currentParked, originalRegistry, originalRuntime, originalUser, originalBuildState, recovery);
 
                 if (recovery.Count != 0)
                     throw new AggregateException("Synthetic create-world recovery did not verify cleanly.", recovery);
@@ -120,6 +140,8 @@ internal static class P1RegressionTests
                     "runtime INI bytes were not restored");
                 True(originalUser.SequenceEqual(await File.ReadAllBytesAsync(env.Context.ServerPaths.UserSettingsPath)),
                     "GameUserSettings.ini bytes were not restored");
+                True(originalBuildState.SequenceEqual(await File.ReadAllBytesAsync(env.Context.StatePaths.BuildStatePath)),
+                    "build-state bytes were not restored");
                 await identity.AuditOrThrowAsync(restored, checkInterruptedOperation: false);
                 True(File.Exists(env.Context.StatePaths.PendingOperationPath), "recovery helper cleared transaction authority before caller completion");
                 journal.Complete();
