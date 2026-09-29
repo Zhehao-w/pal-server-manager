@@ -34,7 +34,7 @@ public sealed partial class MainWindow
         if (constrained && _dashboardScroller is null)
         {
             RootGrid.Children.Remove(_dashboardGrid);
-            _dashboardGrid.MinHeight = ConstrainedDashboardHeight;
+            _dashboardGrid.Height = ConstrainedDashboardHeight;
             _dashboardScroller = new ScrollViewer
             {
                 Content = _dashboardGrid,
@@ -54,7 +54,7 @@ public sealed partial class MainWindow
             _dashboardScroller.Content = null;
             RootGrid.Children.Remove(_dashboardScroller);
             _dashboardScroller = null;
-            _dashboardGrid.MinHeight = 0;
+            _dashboardGrid.Height = double.NaN;
             Grid.SetRow(_dashboardGrid, 1);
             RootGrid.Children.Add(_dashboardGrid);
         }
