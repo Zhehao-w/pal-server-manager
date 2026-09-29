@@ -55,8 +55,8 @@ public sealed class ServerSetupWindow : Window
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         var titleBar = new Grid
         {
-            Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(82, 28, 28, 30)),
-            Padding = new Thickness(18, 0, 144, 0),
+            Background = Brush("PalTitleBarBrush"),
+            Padding = new Thickness(18, 0, 18, 0),
             VerticalAlignment = VerticalAlignment.Stretch
         };
         var titleStack = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 9, VerticalAlignment = VerticalAlignment.Center };
@@ -234,14 +234,15 @@ public sealed class ServerSetupWindow : Window
 
     private static void ConfigureTitleBar(AppWindowTitleBar titleBar)
     {
-        titleBar.ButtonForegroundColor = Colors.White;
-        titleBar.ButtonInactiveForegroundColor = global::Windows.UI.Color.FromArgb(150, 245, 245, 247);
+        var foreground = global::Windows.UI.Color.FromArgb(255, 28, 28, 30);
+        titleBar.ButtonForegroundColor = foreground;
+        titleBar.ButtonInactiveForegroundColor = global::Windows.UI.Color.FromArgb(120, 28, 28, 30);
         titleBar.ButtonBackgroundColor = Colors.Transparent;
         titleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
-        titleBar.ButtonHoverBackgroundColor = global::Windows.UI.Color.FromArgb(32, 255, 255, 255);
-        titleBar.ButtonHoverForegroundColor = Colors.White;
-        titleBar.ButtonPressedBackgroundColor = global::Windows.UI.Color.FromArgb(52, 255, 255, 255);
-        titleBar.ButtonPressedForegroundColor = Colors.White;
+        titleBar.ButtonHoverBackgroundColor = global::Windows.UI.Color.FromArgb(18, 0, 0, 0);
+        titleBar.ButtonHoverForegroundColor = foreground;
+        titleBar.ButtonPressedBackgroundColor = global::Windows.UI.Color.FromArgb(30, 0, 0, 0);
+        titleBar.ButtonPressedForegroundColor = foreground;
     }
 
     private static void ApplyResponsiveMinimum(AppWindow appWindow, WindowId windowId)
