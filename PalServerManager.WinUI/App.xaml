@@ -9,20 +9,23 @@
         <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
       </ResourceDictionary.MergedDictionaries>
 
-      <Color x:Key="PalBackgroundColor">#18242C</Color>
-      <Color x:Key="PalCardColor">#E621313A</Color>
-      <Color x:Key="PalCardAltColor">#E6243741</Color>
-      <Color x:Key="PalBorderColor">#304A54</Color>
-      <Color x:Key="PalCyanColor">#39C6D8</Color>
-      <Color x:Key="PalMintColor">#68D7C3</Color>
-      <Color x:Key="PalTextColor">#F2F7F8</Color>
-      <Color x:Key="PalMutedTextColor">#AEBFC4</Color>
-      <Color x:Key="PalWarmColor">#D5A65A</Color>
-      <Color x:Key="PalDangerColor">#C65A64</Color>
+      <!-- Graphite palette: translucent surfaces let the native Mica backdrop remain visible. -->
+      <Color x:Key="PalBackgroundColor">#151618</Color>
+      <Color x:Key="PalCardColor">#D925272A</Color>
+      <Color x:Key="PalCardAltColor">#B82E3034</Color>
+      <Color x:Key="PalInsetColor">#A51B1D20</Color>
+      <Color x:Key="PalBorderColor">#3AFFFFFF</Color>
+      <Color x:Key="PalCyanColor">#5BA7F7</Color>
+      <Color x:Key="PalMintColor">#62C58F</Color>
+      <Color x:Key="PalTextColor">#F5F5F7</Color>
+      <Color x:Key="PalMutedTextColor">#A7A8AD</Color>
+      <Color x:Key="PalWarmColor">#E3A84F</Color>
+      <Color x:Key="PalDangerColor">#E06C75</Color>
 
       <SolidColorBrush x:Key="PalBackgroundBrush" Color="{StaticResource PalBackgroundColor}" />
       <SolidColorBrush x:Key="PalCardBrush" Color="{StaticResource PalCardColor}" />
       <SolidColorBrush x:Key="PalCardAltBrush" Color="{StaticResource PalCardAltColor}" />
+      <SolidColorBrush x:Key="PalInsetBrush" Color="{StaticResource PalInsetColor}" />
       <SolidColorBrush x:Key="PalBorderBrush" Color="{StaticResource PalBorderColor}" />
       <SolidColorBrush x:Key="PalCyanBrush" Color="{StaticResource PalCyanColor}" />
       <SolidColorBrush x:Key="PalMintBrush" Color="{StaticResource PalMintColor}" />
@@ -35,8 +38,157 @@
         <Setter Property="Background" Value="{StaticResource PalCardBrush}" />
         <Setter Property="BorderBrush" Value="{StaticResource PalBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="CornerRadius" Value="16" />
         <Setter Property="Padding" Value="16" />
+      </Style>
+
+      <Style x:Key="InsetPanelStyle" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource PalInsetBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource PalBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Padding" Value="12" />
+      </Style>
+
+      <Style x:Key="SectionTitleStyle" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{StaticResource PalTextBrush}" />
+        <Setter Property="FontFamily" Value="Segoe UI Variable Display" />
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+      </Style>
+
+      <Style x:Key="CaptionTextStyle" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{StaticResource PalMutedTextBrush}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+      </Style>
+
+      <Style x:Key="PalButtonBaseStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+        <Setter Property="MinHeight" Value="32" />
+        <Setter Property="Padding" Value="12,6" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Background" Value="{StaticResource PalCardAltBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource PalBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Foreground" Value="{StaticResource PalTextBrush}" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="UseSystemFocusVisuals" Value="True" />
+        <Setter Property="Template">
+          <Setter.Value>
+            <ControlTemplate TargetType="Button">
+              <Grid x:Name="Root" Background="Transparent" IsTemplateFocusTarget="True">
+                <VisualStateManager.VisualStateGroups>
+                  <VisualStateGroup x:Name="CommonStates">
+                    <VisualStateGroup.Transitions>
+                      <VisualTransition To="PointerOver" GeneratedDuration="0:0:0.10" />
+                      <VisualTransition To="Pressed" GeneratedDuration="0:0:0.08" />
+                      <VisualTransition To="Normal" GeneratedDuration="0:0:0.12" />
+                    </VisualStateGroup.Transitions>
+                    <VisualState x:Name="Normal" />
+                    <VisualState x:Name="PointerOver">
+                      <VisualState.Setters>
+                        <Setter Target="HoverLayer.Opacity" Value="0.18" />
+                        <Setter Target="Surface.BorderBrush" Value="#72FFFFFF" />
+                      </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="Pressed">
+                      <VisualState.Setters>
+                        <Setter Target="PressedLayer.Opacity" Value="0.24" />
+                        <Setter Target="Surface.BorderBrush" Value="#8AFFFFFF" />
+                        <Setter Target="ContentHost.Opacity" Value="0.86" />
+                      </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="Disabled">
+                      <VisualState.Setters>
+                        <Setter Target="Root.Opacity" Value="0.38" />
+                        <Setter Target="HoverLayer.Opacity" Value="0" />
+                        <Setter Target="PressedLayer.Opacity" Value="0" />
+                      </VisualState.Setters>
+                    </VisualState>
+                  </VisualStateGroup>
+                </VisualStateManager.VisualStateGroups>
+                <Border x:Name="Surface" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}" />
+                <Border x:Name="HoverLayer" Background="{TemplateBinding BorderBrush}" CornerRadius="{TemplateBinding CornerRadius}" Opacity="0" IsHitTestVisible="False" />
+                <Border x:Name="PressedLayer" Background="#FF000000" CornerRadius="{TemplateBinding CornerRadius}" Opacity="0" IsHitTestVisible="False" />
+                <ContentPresenter x:Name="ContentHost"
+                    Content="{TemplateBinding Content}"
+                    ContentTemplate="{TemplateBinding ContentTemplate}"
+                    Foreground="{TemplateBinding Foreground}"
+                    FontFamily="{TemplateBinding FontFamily}"
+                    FontSize="{TemplateBinding FontSize}"
+                    FontWeight="{TemplateBinding FontWeight}"
+                    Padding="{TemplateBinding Padding}"
+                    HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                    VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+              </Grid>
+            </ControlTemplate>
+          </Setter.Value>
+        </Setter>
+      </Style>
+
+      <Style x:Key="CompactIconButtonStyle" TargetType="Button" BasedOn="{StaticResource PalButtonBaseStyle}">
+        <Setter Property="Width" Value="34" />
+        <Setter Property="Height" Value="32" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="Padding" Value="0" />
+      </Style>
+
+      <Style x:Key="InsetRowStyle" TargetType="ListViewItem" BasedOn="{StaticResource DefaultListViewItemStyle}">
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="MinHeight" Value="44" />
+        <Setter Property="UseSystemFocusVisuals" Value="True" />
+        <Setter Property="Template">
+          <Setter.Value>
+            <ControlTemplate TargetType="ListViewItem">
+              <Grid x:Name="RowRoot" Background="Transparent" IsTemplateFocusTarget="True">
+                <VisualStateManager.VisualStateGroups>
+                  <VisualStateGroup x:Name="CommonStates">
+                    <VisualStateGroup.Transitions>
+                      <VisualTransition To="PointerOver" GeneratedDuration="0:0:0.10" />
+                      <VisualTransition To="Pressed" GeneratedDuration="0:0:0.08" />
+                      <VisualTransition To="Normal" GeneratedDuration="0:0:0.12" />
+                    </VisualStateGroup.Transitions>
+                    <VisualState x:Name="Normal" />
+                    <VisualState x:Name="PointerOver"><VisualState.Setters><Setter Target="HoverLayer.Opacity" Value="1" /></VisualState.Setters></VisualState>
+                    <VisualState x:Name="Pressed"><VisualState.Setters><Setter Target="PressedLayer.Opacity" Value="1" /><Setter Target="ContentHost.Opacity" Value="0.88" /></VisualState.Setters></VisualState>
+                    <VisualState x:Name="Selected"><VisualState.Setters><Setter Target="SelectionLayer.Opacity" Value="1" /><Setter Target="SelectionMarker.Opacity" Value="1" /></VisualState.Setters></VisualState>
+                    <VisualState x:Name="PointerOverSelected"><VisualState.Setters><Setter Target="SelectionLayer.Opacity" Value="1" /><Setter Target="SelectionMarker.Opacity" Value="1" /><Setter Target="HoverLayer.Opacity" Value="1" /></VisualState.Setters></VisualState>
+                    <VisualState x:Name="PressedSelected"><VisualState.Setters><Setter Target="SelectionLayer.Opacity" Value="1" /><Setter Target="SelectionMarker.Opacity" Value="1" /><Setter Target="PressedLayer.Opacity" Value="1" /><Setter Target="ContentHost.Opacity" Value="0.88" /></VisualState.Setters></VisualState>
+                    <VisualState x:Name="Disabled"><VisualState.Setters><Setter Target="RowRoot.Opacity" Value="0.38" /><Setter Target="HoverLayer.Opacity" Value="0" /><Setter Target="PressedLayer.Opacity" Value="0" /></VisualState.Setters></VisualState>
+                  </VisualStateGroup>
+                </VisualStateManager.VisualStateGroups>
+                <Border x:Name="SelectionLayer" Margin="4,2" Background="#285BA7F7" BorderBrush="#5A5BA7F7" BorderThickness="1" CornerRadius="8" Opacity="0" IsHitTestVisible="False" />
+                <Border x:Name="HoverLayer" Margin="4,2" Background="#12FFFFFF" BorderBrush="#36FFFFFF" BorderThickness="1" CornerRadius="8" Opacity="0" IsHitTestVisible="False" />
+                <Border x:Name="PressedLayer" Margin="4,2" Background="#26000000" BorderBrush="#55FFFFFF" BorderThickness="1" CornerRadius="8" Opacity="0" IsHitTestVisible="False" />
+                <Border x:Name="SelectionMarker" Width="3" Margin="5,9,0,9" HorizontalAlignment="Left" Background="{StaticResource PalCyanBrush}" CornerRadius="2" Opacity="0" IsHitTestVisible="False" />
+                <ContentPresenter x:Name="ContentHost"
+                    Content="{TemplateBinding Content}"
+                    ContentTemplate="{TemplateBinding ContentTemplate}"
+                    ContentTransitions="{TemplateBinding ContentTransitions}"
+                    Padding="{TemplateBinding Padding}"
+                    HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                    VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+              </Grid>
+            </ControlTemplate>
+          </Setter.Value>
+        </Setter>
+      </Style>
+
+      <Style TargetType="ListViewItem" BasedOn="{StaticResource InsetRowStyle}" />
+
+      <Style TargetType="Button" BasedOn="{StaticResource PalButtonBaseStyle}" />
+
+      <Style TargetType="ContentDialog" BasedOn="{StaticResource DefaultContentDialogStyle}">
+        <Setter Property="CornerRadius" Value="16" />
+      </Style>
+
+      <Style TargetType="Expander" BasedOn="{StaticResource DefaultExpanderStyle}">
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Background" Value="{StaticResource PalCardBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource PalBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
       </Style>
 
       <Style x:Key="MetricLabelStyle" TargetType="TextBlock">
@@ -60,74 +212,7 @@
         <Setter Property="VerticalAlignment" Value="Center" />
       </Style>
 
-      <Style x:Key="ColoredPalButtonBaseStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
-        <Setter Property="MinHeight" Value="32" />
-        <Setter Property="Padding" Value="12,6" />
-        <Setter Property="HorizontalContentAlignment" Value="Center" />
-        <Setter Property="VerticalContentAlignment" Value="Center" />
-        <Setter Property="UseSystemFocusVisuals" Value="False" />
-        <Setter Property="Template">
-          <Setter.Value>
-            <ControlTemplate TargetType="Button">
-              <Grid x:Name="Root" Background="Transparent">
-                <VisualStateManager.VisualStateGroups>
-                  <VisualStateGroup x:Name="CommonStates">
-                    <VisualStateGroup.Transitions>
-                      <VisualTransition To="PointerOver" GeneratedDuration="0:0:0.10" />
-                      <VisualTransition To="Pressed" GeneratedDuration="0:0:0.05" />
-                      <VisualTransition To="Normal" GeneratedDuration="0:0:0.14" />
-                    </VisualStateGroup.Transitions>
-                    <VisualState x:Name="Normal" />
-                    <VisualState x:Name="PointerOver">
-                      <VisualState.Setters>
-                        <Setter Target="HoverLayer.Opacity" Value="1" />
-                        <Setter Target="ContentHost.Opacity" Value="1" />
-                      </VisualState.Setters>
-                    </VisualState>
-                    <VisualState x:Name="Pressed">
-                      <VisualState.Setters>
-                        <Setter Target="PressedLayer.Opacity" Value="1" />
-                        <Setter Target="ContentHost.Opacity" Value="0.92" />
-                      </VisualState.Setters>
-                    </VisualState>
-                    <VisualState x:Name="Disabled">
-                      <VisualState.Setters>
-                        <Setter Target="Root.Opacity" Value="0.42" />
-                      </VisualState.Setters>
-                    </VisualState>
-                  </VisualStateGroup>
-                  <VisualStateGroup x:Name="FocusStates">
-                    <VisualState x:Name="Unfocused" />
-                    <VisualState x:Name="Focused">
-                      <VisualState.Setters><Setter Target="FocusLayer.Opacity" Value="1" /></VisualState.Setters>
-                    </VisualState>
-                    <VisualState x:Name="PointerFocused" />
-                  </VisualStateGroup>
-                </VisualStateManager.VisualStateGroups>
-                <Border
-                    Background="{TemplateBinding Background}"
-                    BorderBrush="{TemplateBinding BorderBrush}"
-                    BorderThickness="{TemplateBinding BorderThickness}"
-                    CornerRadius="6" />
-                <Border x:Name="HoverLayer" Background="#16FFFFFF" BorderBrush="#38FFFFFF" BorderThickness="1" CornerRadius="6" Opacity="0" IsHitTestVisible="False" />
-                <Border x:Name="PressedLayer" Background="#18000000" BorderBrush="#52FFFFFF" BorderThickness="1" CornerRadius="6" Opacity="0" IsHitTestVisible="False" />
-                <Border x:Name="FocusLayer" BorderBrush="#D9FFFFFF" BorderThickness="2" CornerRadius="6" Opacity="0" IsHitTestVisible="False" />
-                <ContentPresenter
-                    x:Name="ContentHost"
-                    Content="{TemplateBinding Content}"
-                    ContentTemplate="{TemplateBinding ContentTemplate}"
-                    Foreground="{TemplateBinding Foreground}"
-                    FontFamily="{TemplateBinding FontFamily}"
-                    FontSize="{TemplateBinding FontSize}"
-                    FontWeight="{TemplateBinding FontWeight}"
-                    Padding="{TemplateBinding Padding}"
-                    HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
-                    VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
-              </Grid>
-            </ControlTemplate>
-          </Setter.Value>
-        </Setter>
-      </Style>
+      <Style x:Key="ColoredPalButtonBaseStyle" TargetType="Button" BasedOn="{StaticResource PalButtonBaseStyle}" />
 
       <Style x:Key="PrimaryPalButtonStyle" TargetType="Button" BasedOn="{StaticResource ColoredPalButtonBaseStyle}">
         <Setter Property="Background" Value="{StaticResource PalCyanBrush}" />

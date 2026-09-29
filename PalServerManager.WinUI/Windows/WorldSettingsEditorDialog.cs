@@ -109,7 +109,7 @@ public static class WorldSettingsEditorDialog
             PrimaryButtonText = session.IsDraft ? "采用此设置" : "保存设置",
             CloseButtonText = "取消",
             DefaultButton = ContentDialogButton.Primary,
-            MinWidth = 900
+            MinWidth = 760
         };
         if (allowRestart && serverRunning)
         {
@@ -144,7 +144,7 @@ public static class WorldSettingsEditorDialog
         IDictionary<string, Control> controls,
         string? note = null)
     {
-        var panel = new StackPanel { Spacing = 2 };
+        var panel = new StackPanel { Spacing = 0 };
         if (!string.IsNullOrWhiteSpace(note))
         {
             panel.Children.Add(new TextBlock
@@ -158,10 +158,12 @@ public static class WorldSettingsEditorDialog
         }
         foreach (var definition in definitions)
         {
-            var row = new Grid { MinHeight = 56, ColumnSpacing = 14, Padding = new Thickness(4, 3, 4, 3) };
+            if (panel.Children.Count > 0)
+                panel.Children.Add(new Border { Height = 1, Background = Brush("PalBorderBrush"), Margin = new Thickness(4, 0, 4, 0) });
+            var row = new Grid { MinHeight = 62, ColumnSpacing = 18, Padding = new Thickness(8, 5, 8, 5) };
             ToolTipService.SetToolTip(row, $"INI: {definition.Key}\n{definition.Description}");
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(260) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(0.42, GridUnitType.Star), MinWidth = 190, MaxWidth = 280 });
             var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
             text.Children.Add(new TextBlock { Text = definition.Label, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
             text.Children.Add(new TextBlock { Text = definition.Description, Foreground = Brush("PalMutedTextBrush"), FontSize = 11, TextWrapping = TextWrapping.Wrap });
