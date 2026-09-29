@@ -28,7 +28,7 @@ public static class WorldSettingsEditorDialog
                 : session.IsDraft
                 ? "这些设置会在新世界第一次生成前应用。"
                 : serverRunning ? "修改将在服务器下次启动后生效。" : "保存后，将在下次启动此存档时生效。",
-            Foreground = Brush("PalMintBrush"),
+            Foreground = Brush("PalMutedTextBrush"),
             TextWrapping = TextWrapping.Wrap,
             FontSize = 12
         };
