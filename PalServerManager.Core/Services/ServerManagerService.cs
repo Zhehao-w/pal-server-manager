@@ -158,6 +158,7 @@ public sealed class ServerManagerService(
         await processes.StartAsync(ct);
         await keepAwake.EnsureRunningAsync(ct);
         var info = await WaitForRestReadyAsync(TimeSpan.FromSeconds(90), ct);
+        await keepAwake.EnsureRunningAsync(ct);
         if (!string.Equals(info.WorldGuid, expected.WorldGuid, StringComparison.OrdinalIgnoreCase))
         {
             await processes.ForceStopAsync(CancellationToken.None);
@@ -194,9 +195,11 @@ public sealed class ServerManagerService(
         var current = slots.GetSlot(registry, registry.ActiveSlotId);
         var newId = registry.NextSlotId; while (registry.Slots.Any(slot => slot.Id == newId)) newId++;
         var parkedName = SaveSlotService.NewParkedFolderName(newId, validatedTag);
+        var newParked = PathSafety.RequireInside(context.ServerPaths.SaveRoot, Path.Combine(context.ServerPaths.SaveRoot, parkedName));
         var currentParked = Path.Combine(context.ServerPaths.SaveRoot, current.ParkedFolder);
         var transactionOld = Path.Combine(context.ServerPaths.SaveRoot, $".pal-new-old-{Guid.NewGuid():N}");
         if (Directory.Exists(currentParked)) throw new IOException($"无法停放当前存档，目标已存在：{currentParked}");
+        if (Directory.Exists(newParked) || File.Exists(newParked)) throw new IOException($"新存档的规范停放目录已存在：{newParked}");
         var originalRegistry = await File.ReadAllBytesAsync(context.StatePaths.RegistryPath, ct);
         var originalBuildState = File.Exists(context.StatePaths.BuildStatePath)
             ? await File.ReadAllBytesAsync(context.StatePaths.BuildStatePath, ct)
@@ -214,6 +217,7 @@ public sealed class ServerManagerService(
             await slots.ClearWorldGuidForGenerationAsync(ct);
             await processes.StartAsync(ct); await keepAwake.EnsureRunningAsync(ct);
             var info = await WaitForRestReadyAsync(TimeSpan.FromSeconds(120), ct);
+            await keepAwake.EnsureRunningAsync(ct);
             if (!Guid.TryParseExact(info.WorldGuid, "N", out var generatedGuid))
                 throw new InvalidOperationException("PalServer 返回的新世界 UID 无效，已拒绝注册新存档。");
             var expectedUid = generatedGuid.ToString("N").ToUpperInvariant();
