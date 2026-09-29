@@ -46,7 +46,11 @@ public sealed partial class WorldIdentityAuditService(
                 result.Issues.Add(new("DirectoryUidMismatch", $"存档 {slot.Id} · {slot.Tag} 的目录不包含登记的世界 UID {slot.WorldGuid}；实际检测到：{string.Join(", ", actualWorlds.DefaultIfEmpty("无"))}。"));
             if (actualWorlds.Length != 1)
                 result.Issues.Add(new("AmbiguousWorldDirectory", $"存档 {slot.Id} · {slot.Tag} 应只包含一个世界 UID 目录，实际为 {actualWorlds.Length} 个。"));
-            try { await worldSettings.LoadProfileAsync(slot.Id, slot.WorldGuid!, cancellationToken); }
+            try
+            {
+                var profile = await worldSettings.LoadProfileAsync(slot.Id, slot.WorldGuid!, cancellationToken);
+                WorldSettingsValueValidator.ValidateProfile(profile.Values);
+            }
             catch (Exception exception) { result.Issues.Add(new("ProfileIdentity", exception.Message)); }
         }
 
