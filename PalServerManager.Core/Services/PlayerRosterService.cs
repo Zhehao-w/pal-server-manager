@@ -18,7 +18,7 @@ public sealed class PlayerRosterService(PalContext context, SafeFileService file
     private readonly Dictionary<string, DateTimeOffset> _sessionStarts = new(StringComparer.OrdinalIgnoreCase);
     private DateTimeOffset _nextSaveScanUtc = DateTimeOffset.MinValue;
     private DateTimeOffset _nextCheckpointUtc = DateTimeOffset.MinValue;
-    private PlayerRosterSnapshot _currentSnapshot = new([], 0, 0, false);
+    private RosterReadState _currentReadState = RosterReadState.Empty;
     private bool _dirty;
     private int _disposed;
 
@@ -66,7 +66,10 @@ public sealed class PlayerRosterService(PalContext context, SafeFileService file
             }
 
             var snapshot = CreateSnapshot(now);
-            Volatile.Write(ref _currentSnapshot, snapshot);
+            var readState = new RosterReadState(
+                snapshot,
+                new Dictionary<string, DateTimeOffset>(_sessionStarts, StringComparer.OrdinalIgnoreCase));
+            Volatile.Write(ref _currentReadState, readState);
             return snapshot;
         }
         finally
@@ -75,9 +78,24 @@ public sealed class PlayerRosterService(PalContext context, SafeFileService file
         }
     }
 
-    // UI callers only need the last immutable snapshot. Never synchronously wait
-    // on the refresh gate here.
-    public PlayerRosterSnapshot GetCurrentSnapshot(DateTimeOffset now) => Volatile.Read(ref _currentSnapshot);
+    // UI callers only need a stable read model. Never synchronously wait on the
+    // refresh gate here; elapsed online durations are rendered from the supplied
+    // timestamp using the immutable session-start copy captured by RefreshAsync.
+    public PlayerRosterSnapshot GetCurrentSnapshot(DateTimeOffset now)
+    {
+        ThrowIfDisposed();
+        var state = Volatile.Read(ref _currentReadState);
+        if (state.SessionStarts.Count == 0) return state.Snapshot;
+
+        var rows = state.Snapshot.Players.Select(row =>
+        {
+            if (!string.Equals(row.Status, "在线", StringComparison.Ordinal) ||
+                !state.SessionStarts.TryGetValue(row.PlayerId, out var started)) return row;
+            return row with { OnlineDuration = FormatOnlineDuration(now - started) };
+        }).ToArray();
+
+        return state.Snapshot with { Players = rows };
+    }
 
     private async Task EnsureLoadedAsync(CancellationToken cancellationToken)
     {
@@ -343,5 +361,14 @@ public sealed class PlayerRosterService(PalContext context, SafeFileService file
         {
             _gate.Release();
         }
+    }
+
+    private sealed record RosterReadState(
+        PlayerRosterSnapshot Snapshot,
+        IReadOnlyDictionary<string, DateTimeOffset> SessionStarts)
+    {
+        public static RosterReadState Empty { get; } = new(
+            new PlayerRosterSnapshot([], 0, 0, false),
+            new Dictionary<string, DateTimeOffset>(StringComparer.OrdinalIgnoreCase));
     }
 }
