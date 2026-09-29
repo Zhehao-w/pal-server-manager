@@ -9,16 +9,16 @@
         <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
       </ResourceDictionary.MergedDictionaries>
 
-      <Color x:Key="PalBackgroundColor">#17191C</Color>
-      <Color x:Key="PalCardColor">#D926292E</Color>
-      <Color x:Key="PalCardAltColor">#B91E2125</Color>
-      <Color x:Key="PalBorderColor">#4AFFFFFF</Color>
-      <Color x:Key="PalCyanColor">#68B9F2</Color>
-      <Color x:Key="PalMintColor">#69CFA0</Color>
-      <Color x:Key="PalTextColor">#F4F5F6</Color>
-      <Color x:Key="PalMutedTextColor">#AAB0B7</Color>
-      <Color x:Key="PalWarmColor">#E4B56A</Color>
-      <Color x:Key="PalDangerColor">#E58383</Color>
+      <Color x:Key="PalBackgroundColor">#1C1C1E</Color>
+      <Color x:Key="PalCardColor">#D52C2C2E</Color>
+      <Color x:Key="PalCardAltColor">#B5242426</Color>
+      <Color x:Key="PalBorderColor">#24FFFFFF</Color>
+      <Color x:Key="PalCyanColor">#0A84FF</Color>
+      <Color x:Key="PalMintColor">#30D158</Color>
+      <Color x:Key="PalTextColor">#F5F5F7</Color>
+      <Color x:Key="PalMutedTextColor">#A1A1A6</Color>
+      <Color x:Key="PalWarmColor">#FF9F0A</Color>
+      <Color x:Key="PalDangerColor">#FF453A</Color>
 
       <SolidColorBrush x:Key="PalBackgroundBrush" Color="{StaticResource PalBackgroundColor}" />
       <SolidColorBrush x:Key="PalCardBrush" Color="{StaticResource PalCardColor}" />
@@ -30,51 +30,60 @@
       <SolidColorBrush x:Key="PalMutedTextBrush" Color="{StaticResource PalMutedTextColor}" />
       <SolidColorBrush x:Key="PalWarmBrush" Color="{StaticResource PalWarmColor}" />
       <SolidColorBrush x:Key="PalDangerBrush" Color="{StaticResource PalDangerColor}" />
-      <SolidColorBrush x:Key="PalWindowTintBrush" Color="#7117191C" />
-      <SolidColorBrush x:Key="PalInsetBrush" Color="#7A111316" />
+      <SolidColorBrush x:Key="PalWindowTintBrush" Color="#651C1C1E" />
+      <SolidColorBrush x:Key="PalInsetBrush" Color="#A61B1B1D" />
+      <SolidColorBrush x:Key="PalHairlineBrush" Color="#18FFFFFF" />
 
       <FontFamily x:Key="ContentControlThemeFontFamily">Segoe UI Variable Text</FontFamily>
-      <CornerRadius x:Key="ControlCornerRadius">9</CornerRadius>
-      <SolidColorBrush x:Key="ControlFillColorDefaultBrush" Color="#941F2226" />
-      <SolidColorBrush x:Key="ControlFillColorSecondaryBrush" Color="#B52A2E33" />
-      <SolidColorBrush x:Key="ControlFillColorTertiaryBrush" Color="#CC181A1E" />
-      <SolidColorBrush x:Key="ControlStrokeColorDefaultBrush" Color="#52FFFFFF" />
-      <SolidColorBrush x:Key="ControlStrokeColorSecondaryBrush" Color="#32FFFFFF" />
+      <CornerRadius x:Key="ControlCornerRadius">8</CornerRadius>
+      <SolidColorBrush x:Key="ControlFillColorDefaultBrush" Color="#8E2A2A2D" />
+      <SolidColorBrush x:Key="ControlFillColorSecondaryBrush" Color="#A9333336" />
+      <SolidColorBrush x:Key="ControlFillColorTertiaryBrush" Color="#BE202023" />
+      <SolidColorBrush x:Key="ControlStrokeColorDefaultBrush" Color="#30FFFFFF" />
+      <SolidColorBrush x:Key="ControlStrokeColorSecondaryBrush" Color="#1AFFFFFF" />
 
       <SolidColorBrush x:Key="AccentButtonBackground" Color="{StaticResource PalCyanColor}" />
-      <SolidColorBrush x:Key="AccentButtonBackgroundPointerOver" Color="#7CC6F6" />
-      <SolidColorBrush x:Key="AccentButtonBackgroundPressed" Color="#4FA5DF" />
-      <SolidColorBrush x:Key="AccentButtonBackgroundDisabled" Color="#5568B9F2" />
-      <SolidColorBrush x:Key="AccentButtonForeground" Color="#10242A" />
-      <SolidColorBrush x:Key="AccentButtonForegroundPointerOver" Color="#10242A" />
-      <SolidColorBrush x:Key="AccentButtonForegroundPressed" Color="#10242A" />
-      <SolidColorBrush x:Key="AccentButtonForegroundDisabled" Color="#8010242A" />
-      <SolidColorBrush x:Key="AccentButtonBorderBrush" Color="#70DCE7" />
-      <SolidColorBrush x:Key="AccentButtonBorderBrushPointerOver" Color="#A7E3FA" />
-      <SolidColorBrush x:Key="AccentButtonBorderBrushPressed" Color="#70C5EA" />
-      <SolidColorBrush x:Key="AccentButtonBorderBrushDisabled" Color="#3568B9F2" />
+      <SolidColorBrush x:Key="AccentButtonBackgroundPointerOver" Color="#2997FF" />
+      <SolidColorBrush x:Key="AccentButtonBackgroundPressed" Color="#0071E3" />
+      <SolidColorBrush x:Key="AccentButtonBackgroundDisabled" Color="#520A84FF" />
+      <SolidColorBrush x:Key="AccentButtonForeground" Color="White" />
+      <SolidColorBrush x:Key="AccentButtonForegroundPointerOver" Color="White" />
+      <SolidColorBrush x:Key="AccentButtonForegroundPressed" Color="White" />
+      <SolidColorBrush x:Key="AccentButtonForegroundDisabled" Color="#80FFFFFF" />
+      <SolidColorBrush x:Key="AccentButtonBorderBrush" Color="#00000000" />
+      <SolidColorBrush x:Key="AccentButtonBorderBrushPointerOver" Color="#00000000" />
+      <SolidColorBrush x:Key="AccentButtonBorderBrushPressed" Color="#00000000" />
+      <SolidColorBrush x:Key="AccentButtonBorderBrushDisabled" Color="#00000000" />
 
       <Style x:Key="CardStyle" TargetType="Border">
         <Setter Property="Background" Value="{StaticResource PalCardBrush}" />
         <Setter Property="BorderBrush" Value="{StaticResource PalBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="16" />
+        <Setter Property="CornerRadius" Value="12" />
         <Setter Property="Padding" Value="16" />
+      </Style>
+
+      <Style x:Key="GroupedSurfaceStyle" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource PalCardAltBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource PalBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="12" />
       </Style>
 
       <Style x:Key="MetricLabelStyle" TargetType="TextBlock">
         <Setter Property="Foreground" Value="{StaticResource PalMutedTextBrush}" />
-        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontSize" Value="11" />
       </Style>
 
       <Style x:Key="MetricValueStyle" TargetType="TextBlock">
         <Setter Property="Foreground" Value="{StaticResource PalTextBrush}" />
-        <Setter Property="FontSize" Value="17" />
+        <Setter Property="FontSize" Value="16" />
         <Setter Property="FontWeight" Value="SemiBold" />
       </Style>
 
       <Style x:Key="TableHeaderTextStyle" TargetType="TextBlock">
         <Setter Property="Foreground" Value="{StaticResource PalMutedTextBrush}" />
+        <Setter Property="FontSize" Value="11" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="VerticalAlignment" Value="Center" />
       </Style>
@@ -84,23 +93,30 @@
       </Style>
 
       <Style x:Key="SectionHeadingStyle" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="16" />
+        <Setter Property="FontSize" Value="13" />
         <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="Foreground" Value="{StaticResource PalTextBrush}" />
+        <Setter Property="Foreground" Value="{StaticResource PalMutedTextBrush}" />
       </Style>
 
       <Style x:Key="InsetPanelStyle" TargetType="Border">
         <Setter Property="Background" Value="{StaticResource PalInsetBrush}" />
-        <Setter Property="BorderBrush" Value="#35FFFFFF" />
+        <Setter Property="BorderBrush" Value="{StaticResource PalBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="10" />
-        <Setter Property="Padding" Value="12" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="14" />
       </Style>
 
       <Style x:Key="IconPalButtonStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
-        <Setter Property="Width" Value="34" /><Setter Property="Height" Value="32" />
+        <Setter Property="Width" Value="32" /><Setter Property="Height" Value="30" />
         <Setter Property="MinWidth" Value="0" /><Setter Property="Padding" Value="0" />
-        <Setter Property="CornerRadius" Value="9" /><Setter Property="UseSystemFocusVisuals" Value="True" />
+        <Setter Property="CornerRadius" Value="8" /><Setter Property="UseSystemFocusVisuals" Value="True" />
+      </Style>
+
+      <Style x:Key="CompactPalButtonStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+        <Setter Property="MinHeight" Value="32" />
+        <Setter Property="Padding" Value="12,5" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="UseSystemFocusVisuals" Value="True" />
       </Style>
 
       <Style x:Key="ReadOnlyRosterItemStyle" TargetType="ListViewItem" BasedOn="{StaticResource DefaultListViewItemStyle}">
@@ -114,51 +130,42 @@
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         <Setter Property="Padding" Value="2" />
         <Setter Property="Margin" Value="6,2" />
-        <Setter Property="CornerRadius" Value="9" />
+        <Setter Property="CornerRadius" Value="8" />
         <Setter Property="UseSystemFocusVisuals" Value="True" />
-      </Style>
-
-      <Style TargetType="ContentDialog" BasedOn="{StaticResource DefaultContentDialogStyle}">
-        <Setter Property="CornerRadius" Value="16" />
-      </Style>
-      <Style TargetType="Expander" BasedOn="{StaticResource DefaultExpanderStyle}">
-        <Setter Property="Background" Value="{StaticResource PalCardAltBrush}" />
-        <Setter Property="CornerRadius" Value="12" />
-        <Setter Property="Margin" Value="0,0,0,8" />
       </Style>
 
       <Style x:Key="ColoredPalButtonBaseStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
         <Setter Property="MinHeight" Value="32" />
-        <Setter Property="Padding" Value="12,6" />
+        <Setter Property="Padding" Value="12,5" />
         <Setter Property="HorizontalContentAlignment" Value="Center" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
         <Setter Property="UseSystemFocusVisuals" Value="True" />
-        <Setter Property="CornerRadius" Value="9" />
+        <Setter Property="CornerRadius" Value="8" />
         <Setter Property="BorderThickness" Value="1" />
       </Style>
 
       <Style x:Key="PrimaryPalButtonStyle" TargetType="Button" BasedOn="{StaticResource AccentButtonStyle}">
         <Setter Property="MinHeight" Value="32" />
-        <Setter Property="Padding" Value="12,6" />
+        <Setter Property="Padding" Value="12,5" />
         <Setter Property="HorizontalContentAlignment" Value="Center" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
         <Setter Property="UseSystemFocusVisuals" Value="True" />
-        <Setter Property="CornerRadius" Value="9" />
-        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="BorderThickness" Value="0" />
         <Setter Property="FontWeight" Value="SemiBold" />
       </Style>
 
       <Style x:Key="MaintenanceButtonStyle" TargetType="Button" BasedOn="{StaticResource ColoredPalButtonBaseStyle}">
-        <Setter Property="Background" Value="#403A32" />
-        <Setter Property="Foreground" Value="#F3CF9C" />
-        <Setter Property="BorderBrush" Value="#6D604E" />
+        <Setter Property="Background" Value="#20FF9F0A" />
+        <Setter Property="Foreground" Value="#FFD08A" />
+        <Setter Property="BorderBrush" Value="#38FF9F0A" />
         <Setter Property="FontWeight" Value="SemiBold" />
       </Style>
 
       <Style x:Key="DangerButtonStyle" TargetType="Button" BasedOn="{StaticResource ColoredPalButtonBaseStyle}">
-        <Setter Property="Background" Value="#3D2D32" />
-        <Setter Property="Foreground" Value="#FFB4AB" />
-        <Setter Property="BorderBrush" Value="#76505A" />
+        <Setter Property="Background" Value="#20FF453A" />
+        <Setter Property="Foreground" Value="#FF8A82" />
+        <Setter Property="BorderBrush" Value="#40FF453A" />
         <Setter Property="FontWeight" Value="SemiBold" />
       </Style>
     </ResourceDictionary>
