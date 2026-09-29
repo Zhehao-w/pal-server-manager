@@ -13,8 +13,9 @@ public sealed class OperationJournalService(PalContext context, SafeFileService 
 
     public void Complete()
     {
-        if (File.Exists(context.StatePaths.PendingOperationPath)) File.Delete(context.StatePaths.PendingOperationPath);
-        var previous = context.StatePaths.PendingOperationPath + ".previous";
+        var current = context.StatePaths.PendingOperationPath;
+        var previous = current + ".previous";
         if (File.Exists(previous)) File.Delete(previous);
+        if (File.Exists(current)) File.Delete(current);
     }
 }
