@@ -221,7 +221,7 @@ public static class WorldSettingsEditorDialog
                     Minimum = definition.Minimum,
                     Maximum = definition.Maximum,
                     SmallChange = definition.Step,
-                    SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact,
+                    SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Hidden,
                     ValidationMode = NumberBoxValidationMode.InvalidInputOverwritten
                 };
             case WorldSettingKind.Choice:
