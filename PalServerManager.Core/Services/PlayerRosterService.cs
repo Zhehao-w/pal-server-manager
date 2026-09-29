@@ -30,11 +30,11 @@ public sealed class PlayerRosterService(PalContext context, SafeFileService file
         DateTimeOffset now,
         CancellationToken cancellationToken = default)
     {
-        await _gate.WaitAsync(cancellationToken);
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             ThrowIfDisposed();
-            await EnsureLoadedAsync(cancellationToken);
+            await EnsureLoadedAsync(cancellationToken).ConfigureAwait(false);
             var importantChange = SwitchWorldIfNeeded(worldGuid, playersDirectory, now);
 
             if (now >= _nextSaveScanUtc || mode == PlayerPresenceMode.ServerStopped)
@@ -61,7 +61,7 @@ public sealed class PlayerRosterService(PalContext context, SafeFileService file
 
             if (importantChange || (_dirty && now >= _nextCheckpointUtc))
             {
-                await SaveDocumentAsync(cancellationToken);
+                await SaveDocumentAsync(cancellationToken).ConfigureAwait(false);
                 _nextCheckpointUtc = now.AddMinutes(5);
             }
 
@@ -76,8 +76,7 @@ public sealed class PlayerRosterService(PalContext context, SafeFileService file
     }
 
     // UI callers only need the last immutable snapshot. Never synchronously wait
-    // on the async refresh gate here: the refresh continuation may need the UI
-    // context that is asking for this snapshot.
+    // on the refresh gate here.
     public PlayerRosterSnapshot GetCurrentSnapshot(DateTimeOffset now) => Volatile.Read(ref _currentSnapshot);
 
     private async Task EnsureLoadedAsync(CancellationToken cancellationToken)
@@ -92,7 +91,7 @@ public sealed class PlayerRosterService(PalContext context, SafeFileService file
         try
         {
             await using var stream = new FileStream(context.StatePaths.PlayerActivityPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 4096, true);
-            _document = await JsonSerializer.DeserializeAsync<PlayerActivityDocument>(stream, JsonOptions, cancellationToken)
+            _document = await JsonSerializer.DeserializeAsync<PlayerActivityDocument>(stream, JsonOptions, cancellationToken).ConfigureAwait(false)
                 ?? throw new InvalidOperationException("PlayerActivity.json 为空。");
             _document.Worlds ??= [];
             foreach (var world in _document.Worlds.Values) world.Players ??= [];
@@ -285,7 +284,20 @@ public sealed class PlayerRosterService(PalContext context, SafeFileService file
     private async Task SaveDocumentAsync(CancellationToken cancellationToken)
     {
         if (!_dirty || _document is null) return;
-        await files.WriteJsonAsync(context.StatePaths.PlayerActivityPath, _document, JsonOptions, keepPrevious: true, cancellationToken: cancellationToken);
+        // SafeFileService itself is async and may capture a UI SynchronizationContext.
+        // Run the persistence pipeline on the thread pool so a synchronous shutdown
+        // wait can never form a UI-context cycle with the refresh gate.
+        await Task.Run(
+            () => files.WriteJsonAsync(context.StatePaths.PlayerActivityPath, _document, JsonOptions, keepPrevious: true, cancellationToken: cancellationToken),
+            cancellationToken).ConfigureAwait(false);
+        _dirty = false;
+    }
+
+    private void SaveDocument()
+    {
+        if (!_dirty || _document is null) return;
+        Task.Run(() => files.WriteJsonAsync(context.StatePaths.PlayerActivityPath, _document, JsonOptions, keepPrevious: true))
+            .GetAwaiter().GetResult();
         _dirty = false;
     }
 
@@ -320,9 +332,16 @@ public sealed class PlayerRosterService(PalContext context, SafeFileService file
 
     public void Dispose()
     {
-        // Shutdown must never synchronously wait for an async refresh continuation.
-        // Important roster changes are checkpointed by RefreshAsync; disposal only
-        // prevents new refreshes and lets an in-flight refresh finish naturally.
-        Interlocked.Exchange(ref _disposed, 1);
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+        _gate.Wait();
+        try
+        {
+            EndAllSessions(DateTimeOffset.Now);
+            try { SaveDocument(); } catch { }
+        }
+        finally
+        {
+            _gate.Release();
+        }
     }
 }
