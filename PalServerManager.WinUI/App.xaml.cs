@@ -11,7 +11,7 @@ namespace HaoHaoTianTian.PalHR;
 
 public partial class App : Application
 {
-    public const string ProductName = "浩浩添添 Pal 人力资源部";
+    public const string ProductName = "PalServerManager";
     public const string Version = ManagerProduct.Version;
     private static readonly HttpClient HttpClient = new();
     private readonly Mutex _singleInstance;
