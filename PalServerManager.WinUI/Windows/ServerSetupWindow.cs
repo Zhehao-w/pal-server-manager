@@ -17,23 +17,24 @@ public sealed class ServerSetupWindow : Window
     private readonly ServerStateService _serverState;
     private readonly FirstRunServerSetupService _firstRunSetup;
     private readonly TaskCompletionSource<RegisteredServer?> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private readonly ComboBox _servers = new() { MinWidth = 430, PlaceholderText = "选择已登记的服务器" };
-    private readonly ComboBox _candidates = new() { MinWidth = 430, PlaceholderText = "选择自动发现的 PalServer" };
-    private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap, MaxWidth = 640 };
-    private readonly TextBlock _summary = new() { TextWrapping = TextWrapping.Wrap, MaxWidth = 640 };
-    private readonly Button _continue = new() { Content = "进入管理器", Style = (Style)Application.Current.Resources["AccentButtonStyle"] };
-    private readonly Button _attach = new() { Content = "接入并继续", Style = (Style)Application.Current.Resources["AccentButtonStyle"] };
-    private readonly Button _refresh = new() { Content = "重新检查" };
-    private readonly Button _relocate = new() { Content = "重新定位" };
-    private readonly Button _remove = new() { Content = "移除注册（保留状态）" };
-    private readonly StackPanel _panel = new() { Spacing = 12, Padding = new Thickness(26) };
+    private readonly ComboBox _servers = new() { MinWidth = 430, PlaceholderText = "选择已登记的服务器", HorizontalAlignment = HorizontalAlignment.Stretch };
+    private readonly ComboBox _candidates = new() { MinWidth = 430, PlaceholderText = "选择自动发现的 PalServer", HorizontalAlignment = HorizontalAlignment.Stretch };
+    private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap, MaxWidth = 680, Foreground = Brush("PalTextBrush"), FontWeight = Microsoft.UI.Text.FontWeights.SemiBold };
+    private readonly TextBlock _summary = new() { TextWrapping = TextWrapping.Wrap, MaxWidth = 680, Foreground = Brush("PalMutedTextBrush"), FontSize = 11 };
+    private readonly Button _continue = new() { Content = "进入管理器", Style = Style("PrimaryPalButtonStyle") };
+    private readonly Button _attach = new() { Content = "接入并继续", Style = Style("PrimaryPalButtonStyle") };
+    private readonly Button _refresh = new() { Content = "重新检查", Style = Style("CompactPalButtonStyle") };
+    private readonly Button _relocate = new() { Content = "重新定位", Style = Style("CompactPalButtonStyle") };
+    private readonly Button _remove = new() { Content = "移除注册（保留状态）", Style = Style("CompactPalButtonStyle") };
+    private readonly StackPanel _panel = new() { Spacing = 16, Padding = new Thickness(28, 18, 28, 26) };
     private readonly StackPanel _registryButtons = new() { Orientation = Orientation.Horizontal, Spacing = 8 };
     private readonly StackPanel _managementButtons = new() { Orientation = Orientation.Horizontal, Spacing = 8 };
-    private readonly Button _useDetected = new() { Content = "使用此服务器" };
-    private readonly Border _divider = new() { Height = 1, Background = new SolidColorBrush(Colors.Gray), Margin = new Thickness(0, 8, 0, 8) };
+    private readonly Button _useDetected = new() { Content = "使用此服务器", Style = Style("CompactPalButtonStyle") };
     private ServerRegistryDocument _document = new();
     private string? _pendingRoot;
     private bool _busy;
+    private bool _dpiWatcherAttached;
+    private double _lastRasterizationScale;
 
     public ServerSetupWindow(ServerRegistryService registry, ServerStateService serverState, FirstRunServerSetupService firstRunSetup)
     {
@@ -42,33 +43,92 @@ public sealed class ServerSetupWindow : Window
         _firstRunSetup = firstRunSetup;
         Title = $"{App.ProductName} · 服务器设置 · v{App.Version}";
         SystemBackdrop = new MicaBackdrop();
+        ExtendsContentIntoTitleBar = true;
         var id = Win32Interop.GetWindowIdFromWindow(WindowNative.GetWindowHandle(this));
         var appWindow = AppWindow.GetFromWindowId(id);
+        ConfigureTitleBar(appWindow.TitleBar);
         Services.WindowPlacement.CenterOnPrimaryDisplay(appWindow, id, 760, 650);
-        if (appWindow.Presenter is OverlappedPresenter presenter)
-        {
-            presenter.PreferredMinimumWidth = 700;
-            presenter.PreferredMinimumHeight = 590;
-        }
+        ApplyResponsiveMinimum(appWindow, id);
 
-        _panel.Children.Add(new TextBlock { Text = "连接 PalServer", FontSize = 28, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
-        _panel.Children.Add(new TextBlock { Text = "管理器安装目录、服务器目录和每台服务器的管理状态彼此独立。这里不会修改游戏存档。", TextWrapping = TextWrapping.Wrap });
-        _panel.Children.Add(_servers);
-        var detect = new Button { Content = "自动发现" };
-        var browse = new Button { Content = "选择 PalServer.exe" };
-        _registryButtons.Children.Add(detect); _registryButtons.Children.Add(_useDetected); _registryButtons.Children.Add(browse);
-        _panel.Children.Add(_registryButtons);
-        _panel.Children.Add(_candidates);
-        _managementButtons.Children.Add(_continue); _managementButtons.Children.Add(_relocate); _managementButtons.Children.Add(_remove);
-        _panel.Children.Add(_managementButtons);
-        _panel.Children.Add(_divider);
-        _panel.Children.Add(new TextBlock { Text = "服务器与存档", FontSize = 20, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
-        _panel.Children.Add(_status);
-        _panel.Children.Add(_summary);
+        var root = new Grid { Background = Brush("PalWindowTintBrush") };
+        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(54) });
+        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        var titleBar = new Grid
+        {
+            Background = Brush("PalTitleBarBrush"),
+            Padding = new Thickness(18, 0, 18, 0),
+            VerticalAlignment = VerticalAlignment.Stretch
+        };
+        var titleStack = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 9, VerticalAlignment = VerticalAlignment.Center };
+        titleStack.Children.Add(new Image { Source = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri("ms-appx:///Assets/ManagerIconCircular.png")), Width = 24, Height = 24 });
+        titleStack.Children.Add(new TextBlock { Text = App.ProductName, FontSize = 15, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center });
+        titleStack.Children.Add(new TextBlock { Text = "·", Foreground = Brush("PalMutedTextBrush"), FontSize = 11, VerticalAlignment = VerticalAlignment.Center });
+        titleStack.Children.Add(new TextBlock { Text = $"v{App.Version}", Foreground = Brush("PalMutedTextBrush"), FontSize = 11, VerticalAlignment = VerticalAlignment.Center });
+        titleBar.Children.Add(titleStack);
+        root.Children.Add(titleBar);
+        SetTitleBar(titleBar);
+
+        var heading = new StackPanel { Spacing = 3, Margin = new Thickness(2, 0, 2, 2) };
+        heading.Children.Add(new TextBlock { Text = "连接 PalServer", FontSize = 23, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+        heading.Children.Add(new TextBlock { Text = "选择或登记服务器，然后验证当前 SaveGames\\0。接入不会修改游戏存档。", TextWrapping = TextWrapping.Wrap, Foreground = Brush("PalMutedTextBrush"), FontSize = 11 });
+        _panel.Children.Add(heading);
+
+        var detect = new Button { Content = "自动发现", Style = Style("CompactPalButtonStyle") };
+        var browse = new Button { Content = "选择 PalServer.exe", Style = Style("CompactPalButtonStyle") };
+        _registryButtons.Children.Add(detect);
+        _registryButtons.Children.Add(_useDetected);
+        _registryButtons.Children.Add(browse);
+        _managementButtons.Children.Add(_continue);
+        _managementButtons.Children.Add(_relocate);
+        _managementButtons.Children.Add(_remove);
+
+        _panel.Children.Add(SectionLabel("服务器"));
+        var serverGroup = new StackPanel { Spacing = 10, Padding = new Thickness(14, 12, 14, 12) };
+        serverGroup.Children.Add(_servers);
+        serverGroup.Children.Add(_candidates);
+        serverGroup.Children.Add(_registryButtons);
+        serverGroup.Children.Add(_managementButtons);
+        _panel.Children.Add(Group(serverGroup));
+
+        _panel.Children.Add(SectionLabel("服务器与存档"));
         var stateButtons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-        stateButtons.Children.Add(_attach); stateButtons.Children.Add(_refresh);
-        _panel.Children.Add(stateButtons);
-        Content = new ScrollViewer { Content = _panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        stateButtons.Children.Add(_attach);
+        stateButtons.Children.Add(_refresh);
+        var stateGroup = new StackPanel { Spacing = 10, Padding = new Thickness(14, 12, 14, 12) };
+        stateGroup.Children.Add(_status);
+        stateGroup.Children.Add(new Border { Height = 1, Background = Brush("PalHairlineBrush"), Margin = new Thickness(0, 2, 0, 2) });
+        stateGroup.Children.Add(_summary);
+        stateGroup.Children.Add(stateButtons);
+        _panel.Children.Add(Group(stateGroup));
+
+        var rootScroller = new ScrollViewer
+        {
+            Content = _panel,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+        };
+        Grid.SetRow(rootScroller, 1);
+        root.Children.Add(rootScroller);
+        Content = root;
+        rootScroller.Loaded += (_, _) =>
+        {
+            if (_dpiWatcherAttached) return;
+            _dpiWatcherAttached = true;
+            var xamlRoot = rootScroller.XamlRoot;
+            _lastRasterizationScale = xamlRoot.RasterizationScale;
+            ApplyResponsiveMinimum(appWindow, id);
+            xamlRoot.Changed += (_, _) =>
+            {
+                var scale = xamlRoot.RasterizationScale;
+                if (Math.Abs(scale - _lastRasterizationScale) < 0.001) return;
+                _lastRasterizationScale = scale;
+                ApplyResponsiveMinimum(appWindow, id);
+            };
+            appWindow.Changed += (_, args) =>
+            {
+                if (args.DidPositionChange) ApplyResponsiveMinimum(appWindow, id);
+            };
+        };
 
         Closed += (_, _) => _completion.TrySetResult(null);
         _servers.SelectionChanged += async (_, _) => await RunAsync(PersistSelectionAndAssessAsync);
@@ -76,7 +136,7 @@ public sealed class ServerSetupWindow : Window
         detect.Click += async (_, _) => await RunAsync(async () =>
         {
             _candidates.Items.Clear();
-            foreach (var root in new ServerDiscoveryService().AutoDetect()) _candidates.Items.Add(root);
+            foreach (var rootPath in new ServerDiscoveryService().AutoDetect()) _candidates.Items.Add(rootPath);
             _candidates.Visibility = _candidates.Items.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
             if (_document.Servers.Count > 0)
             {
@@ -153,6 +213,45 @@ public sealed class ServerSetupWindow : Window
 
     public Task<RegisteredServer?> ShowAsync() { Activate(); _ = RunAsync(RefreshAsync); return _completion.Task; }
     public void Dismiss() => Close();
+
+    private static Brush Brush(string key) => (Brush)Application.Current.Resources[key];
+    private static Style Style(string key) => (Style)Application.Current.Resources[key];
+
+    private static TextBlock SectionLabel(string text) => new()
+    {
+        Text = text,
+        FontSize = 13,
+        FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+        Foreground = Brush("PalMutedTextBrush"),
+        Margin = new Thickness(8, 0, 0, -8)
+    };
+
+    private static Border Group(UIElement child) => new()
+    {
+        Style = Style("GroupedSurfaceStyle"),
+        Child = child
+    };
+
+    private static void ConfigureTitleBar(AppWindowTitleBar titleBar)
+    {
+        var foreground = global::Windows.UI.Color.FromArgb(255, 28, 28, 30);
+        titleBar.ButtonForegroundColor = foreground;
+        titleBar.ButtonInactiveForegroundColor = global::Windows.UI.Color.FromArgb(120, 28, 28, 30);
+        titleBar.ButtonBackgroundColor = Colors.Transparent;
+        titleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
+        titleBar.ButtonHoverBackgroundColor = global::Windows.UI.Color.FromArgb(18, 0, 0, 0);
+        titleBar.ButtonHoverForegroundColor = foreground;
+        titleBar.ButtonPressedBackgroundColor = global::Windows.UI.Color.FromArgb(30, 0, 0, 0);
+        titleBar.ButtonPressedForegroundColor = foreground;
+    }
+
+    private static void ApplyResponsiveMinimum(AppWindow appWindow, WindowId windowId)
+    {
+        var workArea = DisplayArea.GetFromWindowId(windowId, DisplayAreaFallback.Primary).WorkArea;
+        if (appWindow.Presenter is not OverlappedPresenter presenter) return;
+        presenter.PreferredMinimumWidth = Math.Min(Services.WindowPlacement.EffectivePixelsToPhysical(windowId, 700), workArea.Width);
+        presenter.PreferredMinimumHeight = Math.Min(Services.WindowPlacement.EffectivePixelsToPhysical(windowId, 590), workArea.Height);
+    }
 
     private async Task RegisterAsync(string exe)
     {
@@ -280,7 +379,15 @@ public sealed class ServerSetupWindow : Window
 
     private async Task<bool> ConfirmAsync(string title, string message)
     {
-        var dialog = new ContentDialog { Title = title, Content = message, PrimaryButtonText = "确认", CloseButtonText = "取消", XamlRoot = _panel.XamlRoot };
+        var dialog = new ContentDialog
+        {
+            Title = title,
+            Content = new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap, MaxWidth = 520, Foreground = Brush("PalTextBrush") },
+            PrimaryButtonText = "确认",
+            CloseButtonText = "取消",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = _panel.XamlRoot
+        };
         return await dialog.ShowAsync() == ContentDialogResult.Primary;
     }
 

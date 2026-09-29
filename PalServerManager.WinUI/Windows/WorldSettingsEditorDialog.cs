@@ -28,19 +28,25 @@ public static class WorldSettingsEditorDialog
                 : session.IsDraft
                 ? "这些设置会在新世界第一次生成前应用。"
                 : serverRunning ? "修改将在服务器下次启动后生效。" : "保存后，将在下次启动此存档时生效。",
-            Foreground = Brush("PalMintBrush"),
+            Foreground = Brush("PalMutedTextBrush"),
             TextWrapping = TextWrapping.Wrap,
-            FontSize = 12
+            FontSize = 12,
+            VerticalAlignment = VerticalAlignment.Center
         };
 
-        var body = new StackPanel { Spacing = 12 };
-        body.Children.Add(new TextBlock
+        var body = new StackPanel
+        {
+            Spacing = 18,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        var header = new StackPanel { Spacing = 5 };
+        header.Children.Add(new TextBlock
         {
             Text = existingWorldImport ? "导入现有存档 · 自定义世界设置" : session.IsDraft ? "新存档 · 自定义世界设置" : $"存档 {session.SlotId} · {session.Tag}",
-            FontSize = 20,
+            FontSize = 22,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
         });
-        body.Children.Add(new TextBlock
+        header.Children.Add(new TextBlock
         {
             Text = includeGlobalSettings
                 ? "每个存档的设置分别保存在 JSON 配置档中。服务器名称等位于最下方的全局区域，不会进入存档配置。"
@@ -49,6 +55,7 @@ public static class WorldSettingsEditorDialog
             TextWrapping = TextWrapping.Wrap,
             FontSize = 12
         });
+        body.Children.Add(header);
 
         foreach (var category in WorldSettingsService.ProfileDefinitions.Select(item => item.Category).Distinct())
         {
@@ -59,7 +66,7 @@ public static class WorldSettingsEditorDialog
             body.Children.Add(BuildCategory("服务器（全局共享）", WorldSettingsService.GlobalDefinitions, globals, controls,
                 "这些值由所有存档共享；管理器不会把它们写入任何存档 profile。AdminPassword、REST、端口和 RCON 不在此处管理。"));
 
-        var utility = new Grid { ColumnSpacing = 8 };
+        var utility = new Grid { ColumnSpacing = 8, Margin = new Thickness(0, 2, 0, 0) };
         utility.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         utility.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         utility.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -96,8 +103,10 @@ public static class WorldSettingsEditorDialog
         var scroll = new ScrollViewer
         {
             Content = body,
-            MaxWidth = 860,
-            MaxHeight = 670,
+            MaxWidth = 840,
+            MaxHeight = 640,
+            Padding = new Thickness(0),
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
         };
@@ -109,7 +118,7 @@ public static class WorldSettingsEditorDialog
             PrimaryButtonText = session.IsDraft ? "采用此设置" : "保存设置",
             CloseButtonText = "取消",
             DefaultButton = ContentDialogButton.Primary,
-            MinWidth = 900
+            MinWidth = 700
         };
         if (allowRestart && serverRunning)
         {
@@ -137,49 +146,67 @@ public static class WorldSettingsEditorDialog
         return outcome is ContentDialogResult.Primary or ContentDialogResult.Secondary ? result : null;
     }
 
-    private static Expander BuildCategory(
+    private static StackPanel BuildCategory(
         string title,
         IReadOnlyList<WorldSettingDefinition> definitions,
         IReadOnlyDictionary<string, string> values,
         IDictionary<string, Control> controls,
         string? note = null)
     {
-        var panel = new StackPanel { Spacing = 2 };
+        var section = new StackPanel { Spacing = 7 };
+        section.Children.Add(new TextBlock
+        {
+            Text = title,
+            FontSize = 13,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = Brush("PalMutedTextBrush")
+        });
+
+        var rows = new StackPanel { Spacing = 0 };
         if (!string.IsNullOrWhiteSpace(note))
         {
-            panel.Children.Add(new TextBlock
+            rows.Children.Add(new TextBlock
             {
                 Text = note,
                 Foreground = Brush("PalMutedTextBrush"),
                 FontSize = 11,
                 TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(4, 4, 4, 8)
+                Margin = new Thickness(16, 12, 16, 10)
             });
+            rows.Children.Add(new Border { Height = 1, Background = Brush("PalBorderBrush"), Opacity = 0.45 });
         }
-        foreach (var definition in definitions)
+
+        for (var index = 0; index < definitions.Count; index++)
         {
-            var row = new Grid { MinHeight = 56, ColumnSpacing = 14, Padding = new Thickness(4, 3, 4, 3) };
+            var definition = definitions[index];
+            var row = new Grid { MinHeight = 64, ColumnSpacing = 20, Padding = new Thickness(16, 8, 16, 8) };
             ToolTipService.SetToolTip(row, $"INI: {definition.Key}\n{definition.Description}");
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(260) });
-            var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(236) });
+            var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Spacing = 2 };
             text.Children.Add(new TextBlock { Text = definition.Label, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
             text.Children.Add(new TextBlock { Text = definition.Description, Foreground = Brush("PalMutedTextBrush"), FontSize = 11, TextWrapping = TextWrapping.Wrap });
             var control = CreateControl(definition, values.TryGetValue(definition.Key, out var value) ? value : "");
+            control.MinHeight = 32;
             control.VerticalAlignment = VerticalAlignment.Center;
             Grid.SetColumn(control, 1);
             row.Children.Add(text);
             row.Children.Add(control);
-            panel.Children.Add(row);
+            rows.Children.Add(row);
+            if (index < definitions.Count - 1)
+                rows.Children.Add(new Border { Height = 1, Background = Brush("PalBorderBrush"), Margin = new Thickness(16, 0, 16, 0), Opacity = 0.45 });
             controls[definition.Key] = control;
         }
-        return new Expander
+
+        section.Children.Add(new Border
         {
-            Header = title,
-            Content = panel,
-            IsExpanded = title.StartsWith("世界", StringComparison.Ordinal) || title.StartsWith("服务器", StringComparison.Ordinal),
-            HorizontalAlignment = HorizontalAlignment.Stretch
-        };
+            Background = Brush("PalCardAltBrush"),
+            BorderBrush = Brush("PalBorderBrush"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(12),
+            Child = rows
+        });
+        return section;
     }
 
     private static Control CreateControl(WorldSettingDefinition definition, string raw)
@@ -202,7 +229,7 @@ public static class WorldSettingsEditorDialog
                     Minimum = definition.Minimum,
                     Maximum = definition.Maximum,
                     SmallChange = definition.Step,
-                    SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact,
+                    SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Hidden,
                     ValidationMode = NumberBoxValidationMode.InvalidInputOverwritten
                 };
             case WorldSettingKind.Choice:
