@@ -4,7 +4,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="PalServerManager">
 
-  <Grid x:Name="RootGrid" Background="{StaticResource PalWindowTintBrush}">
+  <Grid x:Name="RootGrid" Background="{StaticResource PalWindowTintBrush}" Loaded="RootGrid_Loaded">
     <Grid.RowDefinitions>
       <RowDefinition Height="48" />
       <RowDefinition Height="*" />
@@ -113,7 +113,7 @@
         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
         <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
           <Button Content="从备份回档并启动…" Command="{x:Bind ViewModel.RollbackCommand}" />
-          <TextBlock Text="{x:Bind ViewModel.Feedback, Mode=OneWay}" Foreground="{StaticResource PalMintBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="300" />
+          <TextBlock Text="{x:Bind ViewModel.Feedback, Mode=OneWay}" Foreground="{StaticResource PalMutedTextBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="300" />
         </StackPanel>
         <Button Grid.Column="1" Content="取消" Command="{x:Bind ViewModel.CancelCommand}" />
         <Button Grid.Column="2" Content="启动所选存档" Command="{x:Bind ViewModel.StartSelectedCommand}" Style="{StaticResource PrimaryPalButtonStyle}" />
