@@ -36,6 +36,10 @@ public sealed partial class MainWindow
             _lastRasterizationScale = scale;
             ApplyResponsiveMinimum();
         };
+        _appWindow.Changed += (_, args) =>
+        {
+            if (args.DidPositionChange) ApplyResponsiveMinimum();
+        };
 
         ApplyResponsiveMinimum();
         RootGrid.SizeChanged += (_, args) => UpdateConstrainedLayout(args.NewSize.Height);
