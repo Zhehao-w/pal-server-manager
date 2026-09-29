@@ -56,6 +56,13 @@
             <TextBlock Text="编号" Style="{StaticResource TableHeaderTextStyle}" /><TextBlock Grid.Column="1" Text="标签" Style="{StaticResource TableHeaderTextStyle}" /><TextBlock Grid.Column="2" Text="状态" Style="{StaticResource TableHeaderTextStyle}" /><TextBlock Grid.Column="3" Text="存档 UID · LocalData 文件夹" Style="{StaticResource TableHeaderTextStyle}" /><TextBlock Grid.Column="4" Text="大小" Style="{StaticResource TableHeaderTextStyle}" /><TextBlock Grid.Column="5" Text="玩家" Style="{StaticResource TableHeaderTextStyle}" /><TextBlock Grid.Column="6" Text="最后保存" Style="{StaticResource TableHeaderTextStyle}" />
           </Grid>
           <ListView Grid.Row="2" ItemsSource="{x:Bind ViewModel.Saves}" SelectedItem="{x:Bind ViewModel.SelectedSave, Mode=TwoWay}" SelectionMode="Single" DoubleTapped="SaveList_DoubleTapped" ItemContainerStyle="{StaticResource SelectableSaveItemStyle}">
+            <ListView.Resources>
+              <SolidColorBrush x:Key="ListViewItemBackgroundPointerOver" Color="#182FFFFF" />
+              <SolidColorBrush x:Key="ListViewItemBackgroundPressed" Color="#26101214" />
+              <SolidColorBrush x:Key="ListViewItemBackgroundSelected" Color="#354D9BCF" />
+              <SolidColorBrush x:Key="ListViewItemBackgroundSelectedPointerOver" Color="#465DAFE3" />
+              <SolidColorBrush x:Key="ListViewItemBackgroundSelectedPressed" Color="#3C3E85B6" />
+            </ListView.Resources>
             <ListView.ItemTemplate>
               <DataTemplate>
                 <Grid Height="39" Padding="12,0" ColumnSpacing="10">

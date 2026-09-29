@@ -33,11 +33,14 @@ public sealed partial class MainWindow : Window
         var windowId = Win32Interop.GetWindowIdFromWindow(WindowNative.GetWindowHandle(this));
         _appWindow = AppWindow.GetFromWindowId(windowId);
         ConfigureTitleBar(_appWindow.TitleBar);
-        WindowPlacement.CenterOnPrimaryDisplay(_appWindow, windowId, 1080, 980);
+        var workArea = DisplayArea.GetFromWindowId(windowId, DisplayAreaFallback.Primary).WorkArea;
+        var initialWidth = Math.Min(1040, workArea.Width);
+        var initialHeight = Math.Min(900, workArea.Height);
+        WindowPlacement.CenterOnPrimaryDisplay(_appWindow, windowId, initialWidth, initialHeight);
         if (_appWindow.Presenter is OverlappedPresenter presenter)
         {
-            presenter.PreferredMinimumWidth = 1000;
-            presenter.PreferredMinimumHeight = 900;
+            presenter.PreferredMinimumWidth = Math.Min(1000, workArea.Width);
+            presenter.PreferredMinimumHeight = Math.Min(740, workArea.Height);
         }
 
         ViewModel.ConfirmAsync = ShowConfirmationAsync;
